@@ -28,14 +28,11 @@ public class Dash extends View {
 
     public interface Host {
         void startStop();
-        void bell();
         void radarBeep();
         void radarClear();
         boolean radarSound();
         void setRadarSound(boolean on);
         String radarDebug();
-        int bellVolume();
-        void setBellVolume(int pct);
         boolean blockSleep();
         void setBlockSleep(boolean on);
         void discardRide();
@@ -77,12 +74,11 @@ public class Dash extends View {
     static final String[] MENU = {"CAPTEURS", "PROFIL", "SORTIE", "ÉCRAN ET SONS", "CONNEXIONS", "BOUTONS", "QUITTER"};
     static final String[][] SUB = {
             {"PAUSE AUTOMATIQUE"},
-            {"LUMINOSITÉ", "SONNETTE", "ALERTES RADAR"},
+            {"LUMINOSITÉ", "ALERTES RADAR"},
             {"WI-FI", "BLUETOOTH", "PARAMÈTRES ANDROID"}};
     static final String[] SUBT = {"SORTIE", "ÉCRAN ET SONS", "CONNEXIONS"};
     static final int M_SUB = 6;
     private int subId = 0, menuSel = 0;
-    static final int[] BELL = {100, 75, 50, 25, 0};
     static final int[] BRIGHT = {-1, 5, 15, 30, 50, 75, 100};
     private int mode = M_HOME, sel = 0, profSel = 0;
     private boolean profEdit;
@@ -178,11 +174,6 @@ public class Dash extends View {
                 int curB = host.brightness(), k = 0;
                 for (int j = 0; j < BRIGHT.length; j++) if (BRIGHT[j] == curB) k = j;
                 host.setBrightness(BRIGHT[(k + 1) % BRIGHT.length]);
-            } else if (i == 1) {
-                int cb = host.bellVolume(), k = 0;
-                for (int j = 0; j < BELL.length; j++) if (BELL[j] == cb) k = j;
-                host.setBellVolume(BELL[(k + 1) % BELL.length]);
-                if (host.bellVolume() > 0) host.bell();
             } else { host.setRadarSound(!host.radarSound()); if (host.radarSound()) host.radarBeep(); }
         } else {
             if (i == 0) host.openSettings(android.provider.Settings.ACTION_WIFI_SETTINGS);
@@ -196,7 +187,6 @@ public class Dash extends View {
         if (id == 0) return host.autoPause() ? "ACTIVÉE" : "DÉSACTIVÉE";
         if (id == 1) {
             if (i == 0) { int b = host.brightness(); return b < 0 ? "AUTO" : b + " %"; }
-            if (i == 1) return host.bellVolume() > 0 ? host.bellVolume() + " %" : "COUPÉE";
             return host.radarSound() ? "SON ACTIVÉ" : "SON COUPÉ";
         }
         return "›";
@@ -523,14 +513,6 @@ public class Dash extends View {
             if (mode != M_DASH) { menuTap(x, y); return true; }
             boolean paused = state.equals("pause") || state.equals("auto");
             if (paused && Math.abs(dx) < 30 && y > H - BAND - 58 && y < H - BAND - 8) { button(x < 240 ? "startstop" : "lap"); return true; }
-            // double appui sur la zone de données : sonnette
-            if (Math.abs(dx) < 20 && y > HDR + 4 && y < H - BAND - 4) {
-                long tn = now();
-                if (tn - lastTapT < 380 && Math.abs(x - lastTapX) < 60 && Math.abs(y - lastTapY) < 60) {
-                    lastTapT = 0; host.bell(); toast("DRING DRING !", CYAN); return true;
-                }
-                lastTapT = tn; lastTapX = x; lastTapY = y;
-            }
             if (Math.abs(dx) > 60) button(dx < 0 ? "next" : "prev");
             else if (y < 56) openMenu();              // appui sur l'en-tête : menu
             else if (y > H - BAND && x < 240) button("startstop");

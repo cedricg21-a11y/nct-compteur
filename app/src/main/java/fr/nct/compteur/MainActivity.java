@@ -21,7 +21,7 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
     private MapHolder map;
     private Wind wind;
     private android.media.SoundPool sounds;
-    private int bellId, radarId, clearId;
+    private int radarId, clearId;
     private Ride ride;
     private SharedPreferences keys, cfg;
     private boolean learning, errorScreen;
@@ -59,7 +59,6 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
                 .setAudioAttributes(new android.media.AudioAttributes.Builder()
                         .setUsage(android.media.AudioAttributes.USAGE_ALARM)
                         .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION).build()).build();
-        bellId = sounds.load(this, R.raw.bell, 1);
         radarId = sounds.load(this, R.raw.radar, 1);
         clearId = sounds.load(this, R.raw.clear, 1);
         dash = new Dash(this, this);
@@ -223,26 +222,8 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
 
     // ------------------------------------------------------------ Dash.Host
 
-    private final Handler bellH = new Handler();
+    private final Handler soundH = new Handler();
     private int savedVol = -1;
-
-    /** sonnette : volume propre, indépendant du volume du compteur (on pousse le volume média le temps du son) */
-    @Override public void bell() {
-        int pct = bellVolume();
-        if (sounds == null || pct <= 0) return;
-        try {
-            android.media.AudioManager am = (android.media.AudioManager) getSystemService(AUDIO_SERVICE);
-            int max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_ALARM);
-            if (savedVol < 0) savedVol = am.getStreamVolume(android.media.AudioManager.STREAM_ALARM);
-            am.setStreamVolume(android.media.AudioManager.STREAM_ALARM, max, 0);
-            bellH.removeCallbacksAndMessages(null);
-            bellH.postDelayed(() -> {
-                try { if (savedVol >= 0) am.setStreamVolume(android.media.AudioManager.STREAM_ALARM, savedVol, 0); } catch (Exception ignored) {}
-                savedVol = -1;
-            }, 1600);
-        } catch (Exception ignored) {}
-        sounds.play(bellId, pct / 100f, pct / 100f, 1, 0, 1f);
-    }
 
     @Override public boolean radarSound() { return cfg.getBoolean("radarSound", true); }
     @Override public void setRadarSound(boolean on) { cfg.edit().putBoolean("radarSound", on).apply(); }
@@ -259,8 +240,8 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
             int max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_ALARM);
             if (savedVol < 0) savedVol = am.getStreamVolume(android.media.AudioManager.STREAM_ALARM);
             am.setStreamVolume(android.media.AudioManager.STREAM_ALARM, max, 0);
-            bellH.removeCallbacksAndMessages(null);
-            bellH.postDelayed(() -> {
+            soundH.removeCallbacksAndMessages(null);
+            soundH.postDelayed(() -> {
                 try { if (savedVol >= 0) am.setStreamVolume(android.media.AudioManager.STREAM_ALARM, savedVol, 0); } catch (Exception ignored) {}
                 savedVol = -1;
             }, ms);
@@ -274,8 +255,6 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
         return "Radar (données brutes, il y a " + age + " s) : " + ride.ble.radarRaw;
     }
 
-    @Override public int bellVolume() { return cfg.getInt("bellVol", 100); }
-    @Override public void setBellVolume(int pct) { cfg.edit().putInt("bellVol", pct).apply(); }
 
     @Override public void startStop() {
         if (sim != null) { sim.state = sim.state.equals("rec") ? "pause" : "rec"; sample(sim.step()); return; }
