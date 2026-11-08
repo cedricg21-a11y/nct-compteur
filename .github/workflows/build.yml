@@ -64,10 +64,16 @@ jobs:
             adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 2600 --ei page 1 ; sleep 4 ; adb exec-out screencap -p > shots/2-effort.png
             adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 1500 --ei page 2 ; sleep 4 ; adb exec-out screencap -p > shots/3-grimpee.png
             adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 2400 --ei lap 1500 --ei page 3 ; sleep 4 ; adb exec-out screencap -p > shots/4-tour.png
-            adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity ; sleep 6 ; adb exec-out screencap -p > shots/5-premier-lancement.png
+            adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 300 --ei mode 1 ; sleep 3 ; adb exec-out screencap -p > shots/5-menu.png
+            adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 300 --ei mode 2 ; sleep 3 ; adb exec-out screencap -p > shots/6-capteurs.png
+            adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 300 --ei mode 3 ; sleep 3 ; adb exec-out screencap -p > shots/7-profil.png
+            adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity ; sleep 6 ; adb exec-out screencap -p > shots/8-premier-lancement.png
             adb logcat -d -s AndroidRuntime:E NCT-RIDE:* NCT-BLE:* > shots/logcat.txt || true
-      - uses: actions/upload-artifact@v4
+      - name: Publication des captures (branche screens)
         if: always()
-        with:
-          name: screenshots
-          path: shots/
+        run: |
+          cd shots
+          git init -q -b screens
+          git add .
+          git -c user.name=ci -c user.email=ci@nct commit -qm "Captures build ${{ github.run_number }}"
+          git push -f -q "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" screens

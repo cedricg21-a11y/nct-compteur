@@ -74,6 +74,8 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
         }
         dash.quiet = getIntent().getStringExtra("toast") == null;
         dash.showPageNow(getIntent().getIntExtra("page", 0));
+        int md = getIntent().getIntExtra("mode", 0);
+        if (md > 0) dash.openMode(md);
         demoH.post(new Runnable() { @Override public void run() { dash.onSample(sim.step()); demoH.postDelayed(this, 1000); } });
     }
 
@@ -108,10 +110,10 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
     @Override public void onWindowFocusChanged(boolean f) { super.onWindowFocusChanged(f); if (f) immersive(); }
 
     private void immersive() {
+        // barre d'état visible (accès au volet Android), barre de navigation masquée
+        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
     }
 
     @Override protected void onDestroy() {
@@ -182,6 +184,55 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
     @Override public void lap() { ride.lap(); }
     @Override public String finishRide() { return ride.finish(); }
     @Override public void setLearning(boolean on) { learning = on; }
+    @Override public java.util.List<Ble.Found> sensorList() {
+        java.util.List<Ble.Found> l = new java.util.ArrayList<>();
+        if (sim != null) {
+            String[][] demo = {{"pwr", "Quarq DZero 41234"}, {"hr", "HRM-Pro:552310"}, {"pwr", "ASSIOMA48211R"}, {"csc", "Wahoo SPEED 1A2B"}};
+            for (int i = 0; i < demo.length; i++) {
+                Ble.Found f = new Ble.Found(); f.type = demo[i][0]; f.name = demo[i][1]; f.addr = "00:00:00:00:00:0" + i;
+                f.seen = System.currentTimeMillis(); l.add(f);
+            }
+            return l;
+        }
+        l.addAll(ride.ble.found.values());
+        // capteurs enregistrés d'abord, puis par type
+        java.util.Collections.sort(l, (a, b) -> {
+            int sa = sensorStatus(a).isEmpty() ? 1 : 0, sb = sensorStatus(b).isEmpty() ? 1 : 0;
+            if (sa != sb) return sa - sb;
+            return a.type.compareTo(b.type);
+        });
+        return l;
+    }
+
+    @Override public String sensorStatus(Ble.Found f) {
+        if (sim != null) return f.addr.endsWith("0") || f.addr.endsWith("1") ? "on" : "";
+        if (!f.addr.equals(ride.ble.saved(f.type))) return "";
+        Ble.Link l = ride.ble.linkFor(f.type);
+        return l.connected ? "on" : "saved";
+    }
+
+    @Override public void toggleSensor(Ble.Found f) {
+        if (sim != null) return;
+        if (sensorStatus(f).isEmpty()) ride.ble.pair(f); else ride.ble.unpair(f.type);
+    }
+
+    @Override public void setKeepScanning(boolean on) { if (sim == null) ride.ble.setKeepScanning(on); }
+
+    @Override public void saveCfg(int ftp, int hrMax, double weight) {
+        cfg.edit().putInt("ftp", ftp).putInt("hrMax", hrMax).putFloat("weight", (float) weight).apply();
+    }
+
+    @Override public void openAndroidSettings() {
+        try { startActivity(new android.content.Intent(android.provider.Settings.ACTION_SETTINGS)); }
+        catch (Exception e) { dash.toast("PARAMÈTRES INDISPONIBLES", 0xFFE85022); }
+    }
+
+    @Override public void quitApp() {
+        if (ride != null) ride.ble.stop();
+        finishAndRemoveTask();
+        android.os.Process.killProcess(android.os.Process.myPid());
+    }
+
     @Override public void saveKeyMap(Map<Integer, String> map) {
         try {
             JSONObject o = new JSONObject();

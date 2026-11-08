@@ -96,9 +96,45 @@ public class Ble {
         stop(); prefs.edit().clear().apply(); start();
     }
 
+    // ---------------------------------------------------------------- gestion des capteurs
+
+    /** Capteur détecté pendant la recherche. */
+    public static class Found {
+        public String addr, name, type; public int rssi; public long seen;
+    }
+    public final java.util.LinkedHashMap<String, Found> found = new java.util.LinkedHashMap<>();
+    private boolean keepScan;
+
+    /** Recherche continue (écran Capteurs ouvert). */
+    public void setKeepScanning(boolean on) {
+        keepScan = on;
+        if (on) { stopScan(); startScan(); }
+    }
+
+    public String saved(String type) { return prefs.getString(type, null); }
+
+    public Link linkFor(String type) { return type.equals("pwr") ? pwr : type.equals("hr") ? hr : csc; }
+
+    /** Enregistre ce capteur pour son type (remplace l'ancien) et s'y connecte. */
+    public void pair(Found f) {
+        Link l = linkFor(f.type);
+        unpair(f.type);
+        prefs.edit().putString(f.type, f.addr).apply();
+        if (adapter != null) connect(l, adapter.getRemoteDevice(f.addr));
+    }
+
+    /** Oublie le capteur de ce type et le déconnecte. */
+    public void unpair(String type) {
+        Link l = linkFor(type);
+        prefs.edit().remove(type).apply();
+        l.dev = null;
+        if (l.gatt != null) { try { l.gatt.disconnect(); l.gatt.close(); } catch (Exception ignored) {} l.gatt = null; }
+        if (l.connected) { l.connected = false; listener.onSensorEvent(l.type, l.name, false); }
+    }
+
     private void startScan() {
-        if (scanning || adapter == null) return;
-        if (pwr.gatt != null && hr.gatt != null) return;
+        if (scanning || adapter == null || !adapter.isEnabled()) return;
+        if (!keepScan && missingSaved() == 0) return;
         scanner = adapter.getBluetoothLeScanner();
         if (scanner == null) return;
         List<ScanFilter> f = new ArrayList<>();
@@ -107,7 +143,14 @@ public class Ble {
         f.add(new ScanFilter.Builder().setServiceUuid(new ParcelUuid(SVC_CSC)).build());
         ScanSettings s = new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build();
         try { scanner.startScan(f, s, scanCb); scanning = true; } catch (Exception e) { Log.e(TAG, "scan", e); }
-        h.postDelayed(this::stopScan, 30000);
+        h.postDelayed(this::stopScan, keepScan ? 15000 : 30000);
+    }
+
+    /** nombre de capteurs enregistrés mais pas connectés */
+    private int missingSaved() {
+        int n = 0;
+        for (Link l : new Link[]{pwr, hr, csc}) if (prefs.getString(l.type, null) != null && l.gatt == null) n++;
+        return n;
     }
 
     private void stopScan() {
@@ -123,7 +166,7 @@ public class Ble {
             if (now - lastCadData > 4000) cadence = 0;
             if (now - lastHrData > 6000) heartRate = 0;
             // relance la recherche si un capteur manque
-            if (pwr.gatt == null || hr.gatt == null) startScan();
+            if (keepScan || missingSaved() > 0) startScan();
             h.postDelayed(this, 5000);
         }
     };
@@ -134,9 +177,18 @@ public class Ble {
             List<ParcelUuid> u = r.getScanRecord().getServiceUuids();
             if (u == null) return;
             BluetoothDevice d = r.getDevice();
-            if (u.contains(new ParcelUuid(SVC_PWR)) && pwr.gatt == null) connect(pwr, d);
-            else if (u.contains(new ParcelUuid(SVC_HR)) && hr.gatt == null) connect(hr, d);
-            else if (u.contains(new ParcelUuid(SVC_CSC)) && csc.gatt == null && !isUsed(d)) connect(csc, d);
+            String type = u.contains(new ParcelUuid(SVC_PWR)) ? "pwr" : u.contains(new ParcelUuid(SVC_HR)) ? "hr"
+                    : u.contains(new ParcelUuid(SVC_CSC)) ? "csc" : null;
+            if (type == null) return;
+            Found f = found.get(d.getAddress());
+            if (f == null) { f = new Found(); f.addr = d.getAddress(); f.type = type; found.put(f.addr, f); }
+            String n = r.getScanRecord().getDeviceName();
+            if (n == null) n = d.getName();
+            if (n != null) f.name = n; else if (f.name == null) f.name = d.getAddress();
+            f.rssi = r.getRssi(); f.seen = System.currentTimeMillis();
+            // connexion automatique uniquement aux capteurs enregistrés
+            Link l = linkFor(type);
+            if (d.getAddress().equals(prefs.getString(type, null)) && l.gatt == null) connect(l, d);
         }
     };
 
@@ -166,7 +218,9 @@ public class Ble {
                 if (l.gatt == g) l.gatt = null;
                 h.post(() -> { if (was) listener.onSensorEvent(l.type, l.name, false); });
                 // tentative de reconnexion
-                h.postDelayed(() -> { if (l.gatt == null && l.dev != null) connect(l, l.dev); }, 3000);
+                h.postDelayed(() -> {
+                    if (l.gatt == null && l.dev != null && l.dev.getAddress().equals(prefs.getString(l.type, null))) connect(l, l.dev);
+                }, 3000);
             }
         }
 
@@ -184,7 +238,6 @@ public class Ble {
                 g.writeDescriptor(desc);
             }
             l.connected = true;
-            prefs.edit().putString(l.type, g.getDevice().getAddress()).apply();
             h.post(() -> listener.onSensorEvent(l.type, l.name, true));
         }
 

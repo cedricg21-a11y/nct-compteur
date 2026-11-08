@@ -32,6 +32,68 @@ public class Dash extends View {
         String finishRide();
         void saveKeyMap(Map<Integer, String> map);
         void setLearning(boolean on);
+        java.util.List<Ble.Found> sensorList();
+        String sensorStatus(Ble.Found f); // "on" | "saved" | ""
+        void toggleSensor(Ble.Found f);
+        void setKeepScanning(boolean on);
+        void saveCfg(int ftp, int hrMax, double weight);
+        void openAndroidSettings();
+        void quitApp();
+    }
+
+    // ---------------------------------------------------------------- menus
+    static final int M_DASH = 0, M_MENU = 1, M_SENS = 2, M_PROF = 3;
+    static final String[] MENU = {"CAPTEURS", "PROFIL", "BOUTONS", "PARAMÈTRES ANDROID", "QUITTER", "RETOUR"};
+    private int mode = M_DASH, sel = 0, profSel = 0;
+    private boolean profEdit;
+    private java.util.List<Ble.Found> sensCache = new java.util.ArrayList<>();
+    private long sensRefresh;
+
+    public void openMenu() { mode = M_MENU; sel = 0; invalidate(); }
+    public void openMode(int md) { mode = md; sel = 0; if (md == M_SENS) host.setKeepScanning(true); invalidate(); }
+
+    private void menuButton(String b) {
+        if (mode == M_MENU) {
+            if (b.equals("next")) sel = (sel + 1) % MENU.length;
+            else if (b.equals("prev")) sel = (sel + MENU.length - 1) % MENU.length;
+            else if (b.equals("lap")) mode = M_DASH;
+            else if (b.equals("startstop")) menuOk(sel);
+        } else if (mode == M_SENS) {
+            int n = sensCache.size();
+            if (b.equals("next") && n > 0) sel = (sel + 1) % n;
+            else if (b.equals("prev") && n > 0) sel = (sel + n - 1) % n;
+            else if (b.equals("lap")) { host.setKeepScanning(false); mode = M_MENU; sel = 0; }
+            else if (b.equals("startstop") && sel < n) { host.toggleSensor(sensCache.get(sel)); sensRefresh = 0; }
+        } else if (mode == M_PROF) {
+            if (profEdit) {
+                if (b.equals("next")) adjust(+1);
+                else if (b.equals("prev")) adjust(-1);
+                else { profEdit = false; host.saveCfg(m.ftp, m.hrMax, m.weight); }
+            } else {
+                if (b.equals("next")) profSel = (profSel + 1) % 3;
+                else if (b.equals("prev")) profSel = (profSel + 2) % 3;
+                else if (b.equals("startstop")) profEdit = true;
+                else if (b.equals("lap")) { host.saveCfg(m.ftp, m.hrMax, m.weight); mode = M_MENU; sel = 1; }
+            }
+        }
+        invalidate();
+    }
+
+    private void adjust(int d) {
+        if (profSel == 0) m.ftp = Math.max(80, Math.min(600, m.ftp + 5 * d));
+        else if (profSel == 1) m.hrMax = Math.max(120, Math.min(230, m.hrMax + d));
+        else m.weight = Math.max(35, Math.min(150, Math.round((m.weight + .5 * d) * 2) / 2.0));
+    }
+
+    private void menuOk(int i) {
+        switch (i) {
+            case 0: openMode(M_SENS); break;
+            case 1: mode = M_PROF; profSel = 0; profEdit = false; break;
+            case 2: mode = M_DASH; startLearn(); break;
+            case 3: mode = M_DASH; host.openAndroidSettings(); break;
+            case 4: if (state.equals("idle")) host.quitApp(); else toast("SORTIE EN COURS", AMBER); break;
+            default: mode = M_DASH;
+        }
     }
 
     // couleurs
@@ -163,6 +225,7 @@ public class Dash extends View {
 
     public void button(String b) {
         if (learnStep >= 0) return;
+        if (mode != M_DASH) { menuButton(b); return; }
         switch (b) {
             case "next": showPage(cur + 1, 1); break;
             case "prev": showPage(cur - 1, -1); break;
@@ -180,10 +243,7 @@ public class Dash extends View {
                         m.reset(); lastZone = -1;
                         toast(f != null && !f.isEmpty() ? "SORTIE ENREGISTRÉE ✓" : "SORTIE TERMINÉE", CYAN);
                     } else confirm("finish", "TERMINER LA SORTIE ?", "TOUR : enregistrer le fichier .FIT", "START : reprendre");
-                } else {
-                    if (confirmed("learn")) startLearn();
-                    else confirm("learn", "RÉGLER LES BOUTONS ?", "Appuie encore sur TOUR", "pour reconfigurer les 4 boutons");
-                }
+                } else openMenu();
                 break;
         }
         invalidate();
@@ -235,8 +295,12 @@ public class Dash extends View {
     @Override public boolean onTouchEvent(MotionEvent e) {
         if (e.getAction() == MotionEvent.ACTION_DOWN) { sx0 = e.getX(); return true; }
         if (e.getAction() == MotionEvent.ACTION_UP) {
-            float dx = (e.getX() - sx0) / sc;
+            float dx = (e.getX() - sx0) / sc, x = e.getX() / sc, y = e.getY() / sc;
+            if (learnStep >= 0) return true;
+            if (mode != M_DASH) { menuTap(x, y); return true; }
             if (Math.abs(dx) > 60) button(dx < 0 ? "next" : "prev");
+            else if (y < 56) openMenu();              // appui sur l'en-tête : menu
+            else if (y > H - 64 && x < 140) button("startstop");
             return true;
         }
         return super.onTouchEvent(e);
@@ -268,6 +332,7 @@ public class Dash extends View {
         c.restore();
 
         drawFooter(c);
+        if (mode != M_DASH) drawMenus(c, n);
         drawOverlays(c, n);
         drawSplash(c, n);
         c.restore();
@@ -651,6 +716,122 @@ public class Dash extends View {
         float k3 = Math.max(0, Math.min(1, (e - 1400) / 600f));
         if (k3 > 0) text(c, "Ce que la fiche technique ne dit pas", 240, ly + lh + 80, b6, 18, alpha(ORANGE, (int) (255 * k3)), Paint.Align.CENTER, 0);
         c.restoreToCount(sl);
+    }
+
+    // ---------------------------------------------------------------- menus (dessin)
+
+    private static final float ROW0 = 96, ROWH = 74;
+
+    private void panelHeader(Canvas c, String title, String hint) {
+        c.drawColor(BG);
+        drawGlowStatic(c);
+        if (logoNct != null) {
+            float h = 26, w = logoNct.getWidth() * h / logoNct.getHeight();
+            rf.set(16, 13, 16 + w, 13 + h); c.drawBitmap(logoNct, null, rf, pb);
+            brand(c, 16, 45, 88, 48);
+        }
+        text(c, title, 464, 34, bc7, 22, TXT, Paint.Align.RIGHT, .16f);
+        pf.setColor(LINE); c.drawRect(0, 51, 480, 52, pf);
+        pf.setColor(0xE6090E14); c.drawRect(0, H - 64, 480, H, pf);
+        pf.setColor(LINE); c.drawRect(0, H - 64, 480, H - 63, pf);
+        text(c, hint, 240, H - 26, b6, 15, MUTE, Paint.Align.CENTER, 0);
+    }
+
+    private void drawGlowStatic(Canvas c) {
+        pf.setShader(new RadialGradient(240, 120, 380, 0x1A00E5C8, 0x00000000, Shader.TileMode.CLAMP));
+        c.drawRect(0, 0, 480, H, pf); pf.setShader(null);
+    }
+
+    private void row(Canvas c, int i, boolean on, String l1, String l2, String chip, int chipCol) {
+        float t = ROW0 + i * ROWH - 30, b = t + ROWH - 10;
+        pf.setColor(on ? 0xFF13202B : TILE); rf.set(12, t, 468, b); c.drawRoundRect(rf, 14, 14, pf);
+        ps.setColor(on ? CYAN : LINE); ps.setStrokeWidth(on ? 2 : 1); c.drawRoundRect(rf, 14, 14, ps);
+        if (on) { pf.setColor(CYAN); rf.set(12, t + 14, 17, b - 14); c.drawRoundRect(rf, 3, 3, pf); }
+        float yMid = (t + b) / 2;
+        if (l2 == null) text(c, l1, 32, yMid + 9, bc7, 26, on ? TXT : 0xFFB5C2CF, Paint.Align.LEFT, .06f);
+        else {
+            text(c, l1, 32, yMid - 4, b7, 12, on ? CYAN : MUTE, Paint.Align.LEFT, .14f);
+            text(c, l2, 32, yMid + 20, bc7, 24, on ? TXT : 0xFFB5C2CF, Paint.Align.LEFT, .02f);
+        }
+        if (chip != null) {
+            pt.setTypeface(bc7); pt.setTextSize(15); pt.setLetterSpacing(.1f);
+            float w = pt.measureText(chip) + 22;
+            pf.setColor(chipCol); rf.set(454 - w, yMid - 14, 454, yMid + 14); c.drawRoundRect(rf, 14, 14, pf);
+            text(c, chip, 454 - w / 2, yMid + 6, bc7, 15, BG, Paint.Align.CENTER, .1f);
+        }
+    }
+
+    private void drawMenus(Canvas c, long n) {
+        if (mode == M_MENU) {
+            panelHeader(c, "MENU", "▲▼ naviguer  ·  START valider  ·  TOUR retour");
+            for (int i = 0; i < MENU.length; i++) row(c, i, i == sel, MENU[i], null, null, 0);
+        } else if (mode == M_SENS) {
+            if (n - sensRefresh > 1000) { sensCache = host.sensorList(); sensRefresh = n; if (sel >= sensCache.size()) sel = Math.max(0, sensCache.size() - 1); }
+            panelHeader(c, "CAPTEURS", "START ajouter / retirer  ·  TOUR retour");
+            String dots = new String[]{"", ".", "..", "..."}[(int) ((n / 400) % 4)];
+            text(c, "Recherche en cours" + dots, 24, 84, b6, 15, MUTE, Paint.Align.LEFT, 0);
+            if (sensCache.isEmpty()) {
+                text(c, "Aucun capteur détecté pour l'instant.", 240, H / 2 - 20, b6, 18, TXT, Paint.Align.CENTER, 0);
+                text(c, "Réveille-les : tour de manivelle,", 240, H / 2 + 14, b6, 16, MUTE, Paint.Align.CENTER, 0);
+                text(c, "ceinture cardio portée et humidifiée.", 240, H / 2 + 38, b6, 16, MUTE, Paint.Align.CENTER, 0);
+                text(c, "Ferme l'appli Xcadey si elle les utilise.", 240, H / 2 + 62, b6, 16, MUTE, Paint.Align.CENTER, 0);
+            }
+            int max = Math.max(1, (int) ((H - 74 - (ROW0 - 30 + ROWH)) / ROWH));
+            int start = Math.max(0, Math.min(sel - max + 1, sensCache.size() - max));
+            for (int i = start; i < Math.min(sensCache.size(), start + max); i++) {
+                Ble.Found f = sensCache.get(i);
+                String st = host.sensorStatus(f);
+                String tl = f.type.equals("pwr") ? "PUISSANCE" : f.type.equals("hr") ? "CARDIO" : "VITESSE / CADENCE";
+                boolean fresh = n - f.seen < 15000;
+                String chip = st.equals("on") ? "CONNECTÉ" : st.equals("saved") ? "CONNEXION…" : fresh ? "AJOUTER" : "HORS DE PORTÉE";
+                int col = st.equals("on") ? CYAN : st.equals("saved") ? AMBER : fresh ? 0xFF5F7A94 : 0xFF2E3B4A;
+                row(c, i - start + 1, i == sel, tl + (st.isEmpty() ? "" : "  ·  ENREGISTRÉ"), f.name, chip, col);
+            }
+        } else if (mode == M_PROF) {
+            panelHeader(c, "PROFIL", profEdit ? "▲▼ modifier  ·  START valider" : "▲▼ choisir  ·  START modifier  ·  TOUR retour");
+            String[] lab = {"FTP", "FC MAX", "POIDS"};
+            String[] val = {m.ftp + " W", m.hrMax + " bpm", String.format(Locale.US, "%.1f kg", m.weight)};
+            for (int i = 0; i < 3; i++) {
+                boolean on = i == profSel;
+                float t = ROW0 + i * 110 - 30, b = t + 100;
+                pf.setColor(on ? 0xFF13202B : TILE); rf.set(12, t, 468, b); c.drawRoundRect(rf, 14, 14, pf);
+                ps.setColor(on ? (profEdit ? ORANGE : CYAN) : LINE); ps.setStrokeWidth(on ? 2 : 1); c.drawRoundRect(rf, 14, 14, ps);
+                text(c, lab[i], 30, t + 34, b7, 14, on ? CYAN : MUTE, Paint.Align.LEFT, .14f);
+                text(c, val[i], 30, t + 84, bc7, 50, TXT, Paint.Align.LEFT, 0);
+                if (on && profEdit) {
+                    pf.setColor(ORANGE);
+                    rf.set(330, t + 26, 390, t + 86); c.drawRoundRect(rf, 12, 12, pf);
+                    rf.set(398, t + 26, 458, t + 86); c.drawRoundRect(rf, 12, 12, pf);
+                    text(c, "−", 360, t + 70, bc8, 40, BG, Paint.Align.CENTER, 0);
+                    text(c, "+", 428, t + 70, bc8, 40, BG, Paint.Align.CENTER, 0);
+                }
+            }
+            float y = ROW0 + 3 * 110 + 10;
+            text(c, "Rapport FTP / poids : " + f1(m.ftp / m.weight) + " W/kg", 240, y, b6, 18, MUTE, Paint.Align.CENTER, 0);
+            text(c, "Zones de puissance et de FC recalculées automatiquement.", 240, y + 28, b6, 14, DIM, Paint.Align.CENTER, 0);
+        }
+    }
+
+    private void menuTap(float x, float y) {
+        if (y > H - 64) { button("lap"); return; } // bas d'écran : retour
+        if (mode == M_MENU || mode == M_SENS) {
+            int i = (int) Math.floor((y - (ROW0 - 30)) / ROWH);
+            if (mode == M_MENU && i >= 0 && i < MENU.length) { sel = i; menuOk(i); }
+            else if (mode == M_SENS) {
+                int max = Math.max(1, (int) ((H - 74 - (ROW0 - 30 + ROWH)) / ROWH));
+                int start = Math.max(0, Math.min(sel - max + 1, sensCache.size() - max));
+                int k = start + i - 1;
+                if (i >= 1 && k < sensCache.size()) { sel = k; host.toggleSensor(sensCache.get(k)); sensRefresh = 0; }
+            }
+        } else if (mode == M_PROF) {
+            int i = (int) Math.floor((y - (ROW0 - 30)) / 110);
+            if (i >= 0 && i < 3) {
+                if (profEdit && i == profSel && x > 326) adjust(x < 394 ? -1 : 1);
+                else if (profEdit && i == profSel) { profEdit = false; host.saveCfg(m.ftp, m.hrMax, m.weight); }
+                else { profSel = i; profEdit = true; }
+            }
+        }
+        invalidate();
     }
 
     // ---------------------------------------------------------------- utilitaires
