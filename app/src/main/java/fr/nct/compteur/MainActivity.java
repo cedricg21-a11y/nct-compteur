@@ -52,6 +52,7 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
         applyBrightness();
         wind = new Wind(this);
         dash = new Dash(this, this);
+        try { dash.version = getPackageManager().getPackageInfo(getPackageName(), 0).versionName; } catch (Exception ignored) {}
         dash.setCfg(cfg.getInt("ftp", 250), cfg.getInt("hrMax", 185), cfg.getFloat("weight", 72f));
         android.widget.FrameLayout root = new android.widget.FrameLayout(this);
         root.setBackgroundColor(0xFF090E14);

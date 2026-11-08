@@ -173,6 +173,7 @@ public class Dash extends View {
     private float sc = 1, H = 800;
     private long born = System.currentTimeMillis();
     public boolean quiet;
+    public String version = "";
 
     // pages
     private int cur = 0, prev = 0, dir = 1;
@@ -1146,6 +1147,7 @@ public class Dash extends View {
         int hr = cal.get(java.util.Calendar.HOUR_OF_DAY);
         text(c, hr < 5 || hr >= 18 ? "Bonsoir Cédric" : "Salut Cédric", 16, 100, bc8, 40, TXT, Paint.Align.LEFT, 0);
         String date = new java.text.SimpleDateFormat("EEEE d MMMM", Locale.FRANCE).format(cal.getTime());
+        text(c, "v" + version, 464, 100, bc6, 14, DIM, Paint.Align.RIGHT, 0);
         text(c, date.substring(0, 1).toUpperCase(Locale.FRANCE) + date.substring(1), 16, 126, b6, 16, MUTE, Paint.Align.LEFT, 0);
 
         // bouton ROULER
@@ -1252,6 +1254,7 @@ public class Dash extends View {
         if (mode == M_HIST) { drawHistory(c, n); return; }
         if (mode == M_MENU) {
             panelHeader(c, "MENU", "VALIDER  ›");
+            text(c, "NCT Compteur v" + version, 240, H - 72, b6, 12, DIM, Paint.Align.CENTER, 0);
             int b = host.brightness();
             for (int i = 0; i < MENU.length; i++)
                 row(c, i, i == sel, MENU[i], null, i == 2 ? (b < 0 ? "AUTO" : b + " %") : null, CYAN);
