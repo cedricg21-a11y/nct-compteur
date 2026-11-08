@@ -591,8 +591,20 @@ public class Dash extends View {
     // ---------------------------------------------------------------- LIVE : lunette boussole
 
     private void pageLive(Canvas c, float top, float bottom) {
-        float gridT = bottom - 188 - 8, cx = 240, cy = top + (gridT - top) / 2 + 10;
+        float gridT = bottom - 188 - 8, cx = 240;
+        float avail = gridT - top, kz = Math.min(1f, avail / 446f);
+        float cy = top + avail / 2 + 6 * kz;
         float R = 190;
+        // coins (non mis à l'échelle)
+        corner(c, true, top + 18, "TEMP.", tempStr(), TXT, "°C", 46);
+        double wc = windCost();
+        String wcs = Double.isNaN(wc) ? "--" : (wc >= 0 ? "+" : "−") + Math.round(Math.abs(wc));
+        corner(c, false, top + 18, "VENT", wcs, Double.isNaN(wc) ? MUTE : wc >= 0 ? ORANGE : CYAN, " W", 46);
+        text(c, s.hr > 0 ? i0(v("hr")) : "--", 14, gridT - 22, bc8, 40, 0xFFFF6B3D, Paint.Align.LEFT, 0);
+        text(c, "♥ BPM", 14, gridT - 6, bc6, 13, MUTE, Paint.Align.LEFT, .08f);
+        text(c, i0(v("wbal")) + "%", 466, gridT - 22, bc8, 40, wcol(v("wbal")), Paint.Align.RIGHT, 0);
+        text(c, "W'BAL", 466, gridT - 6, bc6, 13, MUTE, Paint.Align.RIGHT, .08f);
+        c.save(); c.scale(kz, kz, cx, cy);
         // lunette
         ps.setStrokeCap(Paint.Cap.BUTT);
         ps.setColor(0xFF111A24); ps.setStrokeWidth(18); c.drawCircle(cx, cy, R, ps);
@@ -659,15 +671,7 @@ public class Dash extends View {
         text(c, String.format(Locale.US, "%.2f", m.spdAvg()), cx, cy + 92, bc7, 30, CYAN, Paint.Align.CENTER, 0);
         path.reset(); path.moveTo(cx, cy + 116); path.lineTo(cx + 11, cy + 142); path.lineTo(cx, cy + 136); path.lineTo(cx - 11, cy + 142); path.close();
         pf.setColor(TXT); c.drawPath(path, pf);
-        // coins
-        corner(c, true, cy - 210, "TEMP.", tempStr(), TXT, "°C", 46);
-        double wc = windCost();
-        String wcs = Double.isNaN(wc) ? "--" : (wc >= 0 ? "+" : "−") + Math.round(Math.abs(wc));
-        corner(c, false, cy - 210, "VENT", wcs, Double.isNaN(wc) ? MUTE : wc >= 0 ? ORANGE : CYAN, " W", 46);
-        text(c, s.hr > 0 ? i0(v("hr")) : "--", 14, cy + 186, bc8, 40, 0xFFFF6B3D, Paint.Align.LEFT, 0);
-        text(c, "♥ BPM", 14, cy + 202, bc6, 13, MUTE, Paint.Align.LEFT, .08f);
-        text(c, i0(v("wbal")) + "%", 466, cy + 186, bc8, 40, wcol(v("wbal")), Paint.Align.RIGHT, 0);
-        text(c, "W'BAL", 466, cy + 202, bc6, 13, MUTE, Paint.Align.RIGHT, .08f);
+        c.restore();
         // grille
         float rh = 94;
         gridLines(c, gridT, 2, rh);
