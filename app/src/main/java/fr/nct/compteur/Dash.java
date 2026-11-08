@@ -40,12 +40,16 @@ public class Dash extends View {
         boolean autoPause();
         void setAutoPause(boolean on);
         void openAndroidSettings();
+        void openSettings(String action);
+        int brightness();          // -1 = auto (système), sinon 1..100
+        void setBrightness(int pct);
         void quitApp();
     }
 
     // ---------------------------------------------------------------- menus
     static final int M_DASH = 0, M_MENU = 1, M_SENS = 2, M_PROF = 3;
-    static final String[] MENU = {"CAPTEURS", "PROFIL", "BOUTONS", "PARAMÈTRES ANDROID", "QUITTER", "RETOUR"};
+    static final String[] MENU = {"CAPTEURS", "PROFIL", "LUMINOSITÉ", "BOUTONS", "WI-FI", "BLUETOOTH", "PARAMÈTRES ANDROID", "QUITTER", "RETOUR"};
+    static final int[] BRIGHT = {-1, 5, 15, 30, 50, 75, 100};
     private int mode = M_DASH, sel = 0, profSel = 0;
     private boolean profEdit;
     private java.util.List<Ble.Found> sensCache = new java.util.ArrayList<>();
@@ -91,9 +95,17 @@ public class Dash extends View {
         switch (i) {
             case 0: openMode(M_SENS); break;
             case 1: mode = M_PROF; profSel = 0; profEdit = false; break;
-            case 2: mode = M_DASH; startLearn(); break;
-            case 3: mode = M_DASH; host.openAndroidSettings(); break;
-            case 4: if (state.equals("idle")) host.quitApp(); else toast("SORTIE EN COURS", AMBER); break;
+            case 2: { // luminosité : cycle des niveaux
+                int curB = host.brightness(), k = 0;
+                for (int j = 0; j < BRIGHT.length; j++) if (BRIGHT[j] == curB) k = j;
+                host.setBrightness(BRIGHT[(k + 1) % BRIGHT.length]);
+                break;
+            }
+            case 3: mode = M_DASH; startLearn(); break;
+            case 4: host.openSettings(android.provider.Settings.ACTION_WIFI_SETTINGS); break;
+            case 5: host.openSettings(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS); break;
+            case 6: host.openAndroidSettings(); break;
+            case 7: if (state.equals("idle")) host.quitApp(); else toast("SORTIE EN COURS", AMBER); break;
             default: mode = M_DASH;
         }
     }
@@ -766,7 +778,7 @@ public class Dash extends View {
 
     // ---------------------------------------------------------------- menus (dessin)
 
-    private static final float ROW0 = 96, ROWH = 74;
+    private static final float ROW0 = 96, ROWH = 68;
 
     private void panelHeader(Canvas c, String title, String hint) {
         c.drawColor(BG);
@@ -810,7 +822,9 @@ public class Dash extends View {
     private void drawMenus(Canvas c, long n) {
         if (mode == M_MENU) {
             panelHeader(c, "MENU", "▲▼ naviguer  ·  START valider  ·  TOUR retour");
-            for (int i = 0; i < MENU.length; i++) row(c, i, i == sel, MENU[i], null, null, 0);
+            int b = host.brightness();
+            for (int i = 0; i < MENU.length; i++)
+                row(c, i, i == sel, MENU[i], null, i == 2 ? (b < 0 ? "AUTO" : b + " %") : null, CYAN);
         } else if (mode == M_SENS) {
             if (n - sensRefresh > 1000) { sensCache = host.sensorList(); sensRefresh = n; if (sel >= sensCache.size()) sel = Math.max(0, sensCache.size() - 1); }
             panelHeader(c, "CAPTEURS", "START ajouter / retirer  ·  TOUR retour");

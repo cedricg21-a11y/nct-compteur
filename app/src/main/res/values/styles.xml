@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="NctTheme" parent="android:Theme.Material.NoActionBar.Fullscreen">
+    <style name="NctTheme" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@android:color/black</item>
         <item name="android:colorPrimary">#090e14</item>
         <item name="android:colorAccent">#00e5c8</item>

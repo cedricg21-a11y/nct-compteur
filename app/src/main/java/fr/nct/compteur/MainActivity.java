@@ -47,6 +47,7 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
             return;
         }
 
+        applyBrightness();
         dash = new Dash(this, this);
         dash.setCfg(cfg.getInt("ftp", 250), cfg.getInt("hrMax", 185), cfg.getFloat("weight", 72f));
         setContentView(dash);
@@ -230,6 +231,25 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
     @Override public void setAutoPause(boolean on) {
         if (sim != null) { simAuto = on; return; }
         ride.autoPause = on; cfg.edit().putBoolean("autopause", on).apply();
+    }
+
+    @Override public void openSettings(String action) {
+        try { startActivity(new android.content.Intent(action)); }
+        catch (Exception e) { openAndroidSettings(); }
+    }
+
+    @Override public int brightness() { return cfg.getInt("bright", -1); }
+
+    @Override public void setBrightness(int pct) {
+        cfg.edit().putInt("bright", pct).apply();
+        applyBrightness();
+    }
+
+    private void applyBrightness() {
+        int b = cfg.getInt("bright", -1);
+        WindowManager.LayoutParams lp = getWindow().getAttributes();
+        lp.screenBrightness = b < 0 ? WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE : b / 100f;
+        getWindow().setAttributes(lp);
     }
 
     @Override public void openAndroidSettings() {
