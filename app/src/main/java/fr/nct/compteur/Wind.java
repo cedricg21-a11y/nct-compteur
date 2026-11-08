@@ -32,13 +32,21 @@ public class Wind {
             String js = prefs.getString("json", "{}");
             parse(new JSONObject(js));
             fetchedAt = js.contains("temperature_2m") ? prefs.getLong("at", 0) : 0; // ancien cache sans température : on recharge
+            if (prefs.contains("lat")) { fLat = prefs.getFloat("lat", 0); fLon = prefs.getFloat("lon", 0); }
         } catch (Exception ignored) {}
     }
 
-    /** à appeler régulièrement : télécharge si la prévision a plus de 15 min (essai max toutes les 2 min). */
+    private double fLat = Double.NaN, fLon = Double.NaN;
+
+    /**
+     * à appeler régulièrement : télécharge si la prévision a plus d'une heure, ou si on s'est éloigné
+     * de plus de 20 km du point de prévision (essai au plus toutes les 5 min, sans réseau rien ne se passe).
+     */
     public void maybeRefresh(final double lat, final double lon) {
         long now = System.currentTimeMillis();
-        if (busy || now - fetchedAt < 15 * 60000L || now - lastTry < 2 * 60000L) return;
+        boolean far = !Double.isNaN(fLat) && distKm(lat, lon, fLat, fLon) > 20;
+        if (busy || now - lastTry < 5 * 60000L) return;
+        if (now - fetchedAt < 60 * 60000L && !far) return;
         lastTry = now; busy = true;
         new Thread(() -> {
             try {
@@ -53,12 +61,20 @@ public class Wind {
                 JSONObject o = new JSONObject(sb.toString());
                 parse(o);
                 fetchedAt = System.currentTimeMillis();
+                fLat = lat; fLon = lon;
+                prefs.edit().putFloat("lat", (float) lat).putFloat("lon", (float) lon).apply();
                 prefs.edit().putString("json", sb.toString()).putLong("at", fetchedAt).apply();
                 Log.i(TAG, "prévision vent mise à jour");
             } catch (Exception e) {
                 Log.w(TAG, "pas de réseau pour le vent : " + e.getMessage());
             } finally { busy = false; }
         }).start();
+    }
+
+    static double distKm(double a1, double o1, double a2, double o2) {
+        double dl = Math.toRadians(a2 - a1), dn = Math.toRadians(o2 - o1);
+        double h = Math.sin(dl / 2) * Math.sin(dl / 2) + Math.cos(Math.toRadians(a1)) * Math.cos(Math.toRadians(a2)) * Math.sin(dn / 2) * Math.sin(dn / 2);
+        return 12742 * Math.asin(Math.sqrt(h));
     }
 
     private synchronized void parse(JSONObject o) throws Exception {
