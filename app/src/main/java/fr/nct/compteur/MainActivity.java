@@ -18,6 +18,7 @@ import java.util.Map;
 
 public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
     private Dash dash;
+    private MapHolder map;
     private Ride ride;
     private SharedPreferences keys, cfg;
     private boolean learning, errorScreen;
@@ -50,7 +51,12 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
         applyBrightness();
         dash = new Dash(this, this);
         dash.setCfg(cfg.getInt("ftp", 250), cfg.getInt("hrMax", 185), cfg.getFloat("weight", 72f));
-        setContentView(dash);
+        android.widget.FrameLayout root = new android.widget.FrameLayout(this);
+        root.setBackgroundColor(0xFF090E14);
+        map = new MapHolder(this);
+        if (map.view != null) root.addView(map.view);
+        root.addView(dash);
+        setContentView(root);
 
         ride = Ride.get(this);
         ride.autoPause = cfg.getBoolean("autopause", true);
@@ -71,7 +77,9 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
         if (getIntent().getStringExtra("splash") == null) dash.skipSplash();
         dash.quiet = true;
         for (int i = 0; i < ff; i++) {
-            dash.onSample(sim.step());
+            Ride.Sample smp = sim.step();
+            dash.onSample(smp);
+            if (map != null && i > ff - 600) map.update(smp);
             if (sim.time() == lapAt) dash.newLapQuiet();
         }
         dash.quiet = getIntent().getStringExtra("toast") == null;
@@ -80,7 +88,7 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
         if (md > 0 && md < 8) dash.openMode(md);
         if (md == 9) dash.demoSummary();
         if (md == 8) { sim.state = "pause"; dash.onSample(sim.step()); }
-        demoH.post(new Runnable() { @Override public void run() { dash.onSample(sim.step()); demoH.postDelayed(this, 1000); } });
+        demoH.post(new Runnable() { @Override public void run() { sample(sim.step()); demoH.postDelayed(this, 1000); } });
     }
 
     private void showError(String msg) {
@@ -122,6 +130,7 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
 
     @Override protected void onDestroy() {
         demoH.removeCallbacksAndMessages(null);
+        if (map != null) map.destroy();
         if (ride != null) ride.detach(this);
         super.onDestroy();
     }
@@ -176,7 +185,10 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
 
     // ------------------------------------------------------------ Ride.Ui
 
-    @Override public void sample(Ride.Sample s) { if (dash != null) dash.onSample(s); }
+    @Override public void sample(Ride.Sample s) {
+        if (dash != null) dash.onSample(s);
+        if (map != null) map.update(s);
+    }
 
     @Override public void event(String kind, String text) {
         if (dash != null) dash.sensorEvent(text, !text.startsWith("✕"));
@@ -186,7 +198,10 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
 
     @Override public void startStop() { ride.startStop(); }
     @Override public void lap() { ride.lap(); }
-    @Override public String finishRide() { return sim != null ? "2026-11-08_16-10_NCT.fit" : ride.finish(); }
+    @Override public String finishRide() {
+        if (map != null) map.clearTrack();
+        return sim != null ? "2026-11-08_16-10_NCT.fit" : ride.finish();
+    }
     @Override public void setLearning(boolean on) { learning = on; }
     @Override public java.util.List<Ble.Found> sensorList() {
         java.util.List<Ble.Found> l = new java.util.ArrayList<>();
@@ -232,6 +247,11 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
         if (sim != null) { simAuto = on; return; }
         ride.autoPause = on; cfg.edit().putBoolean("autopause", on).apply();
     }
+
+    @Override public boolean mapReady() { return map != null && map.ready; }
+    @Override public String mapInfo() { return map == null ? "" : map.info; }
+    @Override public void setMapVisible(boolean on) { if (map != null) map.setVisible(on); }
+    @Override public void mapZoom(int d) { if (map != null) map.zoom(d); }
 
     @Override public void openSettings(String action) {
         try { startActivity(new android.content.Intent(action)); }

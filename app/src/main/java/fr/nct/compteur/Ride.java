@@ -39,7 +39,9 @@ public class Ride implements Ble.Listener, LocationListener, SensorEventListener
     public static class Sample {
         public int p, hr, cad, bat; public double spd, dist, alt; public String state; public long elapsed;
         public boolean sPwr, sHr, sGps, sCsc;
+        public double lat = Double.NaN, lon = Double.NaN; public float bearing;
     }
+    private float lastBearing = 0;
 
     public interface Ui {
         void sample(Sample s);
@@ -142,6 +144,11 @@ public class Ride implements Ble.Listener, LocationListener, SensorEventListener
         s.p = p; s.hr = hr; s.cad = cad; s.spd = spd; s.dist = distM; s.alt = alt;
         s.state = state; s.elapsed = timerS; s.bat = battery();
         s.sPwr = ble.pwrOk(); s.sHr = ble.hrOk(); s.sGps = gpsFix; s.sCsc = ble.cscOk();
+        if (last != null && gpsFix) {
+            s.lat = last.getLatitude(); s.lon = last.getLongitude();
+            if (last.hasBearing() && last.getSpeed() > 1.5) lastBearing = last.getBearing();
+        }
+        s.bearing = lastBearing;
         ui.sample(s);
     }
 

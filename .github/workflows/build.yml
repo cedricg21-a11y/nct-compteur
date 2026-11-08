@@ -42,6 +42,12 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: apk
+      - name: Carte de test (Mapsforge Basse-Normandie)
+        run: |
+          curl -fsSL -o test.map https://download.mapsforge.org/maps/v5/europe/france/basse-normandie.map \
+          || curl -fsSL -o test.map https://download.mapsforge.org/maps/v5/europe/france/normandie.map \
+          || echo "pas de carte"
+          ls -la
       - name: Activer KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -59,18 +65,21 @@ jobs:
           script: |
             mkdir -p shots
             adb install -r nct-compteur.apk
+            adb shell mkdir -p /sdcard/NCT/maps ; adb push test.map /sdcard/NCT/maps/test.map || true
+            adb shell pm grant fr.nct.compteur android.permission.READ_EXTERNAL_STORAGE ; adb shell pm grant fr.nct.compteur android.permission.WRITE_EXTERNAL_STORAGE ; adb shell pm grant fr.nct.compteur android.permission.ACCESS_FINE_LOCATION
             adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 -e splash 1 ; sleep 2 ; adb exec-out screencap -p > shots/0-splash.png
             adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 1000 --ei page 0 ; sleep 4 ; adb exec-out screencap -p > shots/1-live.png
-            adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 2600 --ei page 1 ; sleep 4 ; adb exec-out screencap -p > shots/2-effort.png
-            adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 1500 --ei page 2 ; sleep 4 ; adb exec-out screencap -p > shots/3-grimpee.png
-            adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 2400 --ei lap 1500 --ei page 3 ; sleep 4 ; adb exec-out screencap -p > shots/4-tour.png
+            adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 1000 --ei page 1 ; sleep 12 ; adb exec-out screencap -p > shots/1b-carte.png
+            adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 2600 --ei page 2 ; sleep 4 ; adb exec-out screencap -p > shots/2-effort.png
+            adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 1500 --ei page 3 ; sleep 4 ; adb exec-out screencap -p > shots/3-grimpee.png
+            adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 2400 --ei lap 1500 --ei page 4 ; sleep 4 ; adb exec-out screencap -p > shots/4-tour.png
             adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 300 --ei mode 1 ; sleep 3 ; adb exec-out screencap -p > shots/5-menu.png
             adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 300 --ei mode 2 ; sleep 3 ; adb exec-out screencap -p > shots/6-capteurs.png
             adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 300 --ei mode 3 ; sleep 3 ; adb exec-out screencap -p > shots/7-profil.png
             adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 3000 --ei mode 9 ; sleep 3 ; adb exec-out screencap -p > shots/9-resume.png
             adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 3000 --ei mode 8 ; sleep 3 ; adb exec-out screencap -p > shots/9a-pause.png
             adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity ; sleep 6 ; adb exec-out screencap -p > shots/8-premier-lancement.png
-            adb logcat -d -s AndroidRuntime:E NCT-RIDE:* NCT-BLE:* > shots/logcat.txt || true
+            adb logcat -d -s AndroidRuntime:E NCT-RIDE:* NCT-BLE:* NCT-MAP:* > shots/logcat.txt || true
       - name: Publication des captures (branche screens)
         if: always()
         run: |

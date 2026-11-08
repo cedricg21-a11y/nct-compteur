@@ -40,6 +40,10 @@ public class Dash extends View {
         boolean autoPause();
         void setAutoPause(boolean on);
         void openAndroidSettings();
+        boolean mapReady();
+        String mapInfo();
+        void setMapVisible(boolean on);
+        void mapZoom(int d);
         void openSettings(String action);
         int brightness();          // -1 = auto (système), sinon 1..100
         void setBrightness(int pct);
@@ -114,7 +118,8 @@ public class Dash extends View {
     static final int BG = 0xFF090E14, TILE = 0xFF0E151E, LINE = 0xFF1A2532, MUTE = 0xFF6C7D90, TXT = 0xFFEEF3F7,
             CYAN = 0xFF00E5C8, ORANGE = 0xFFE85022, AMBER = 0xFFFFB02E, DIM = 0xFF3D4D5F;
 
-    static final String[] PAGES = {"LIVE", "EFFORT", "GRIMPÉE", "TOUR"};
+    static final String[] PAGES = {"LIVE", "CARTE", "EFFORT", "GRIMPÉE", "TOUR"};
+    static final int P_MAP = 1;
 
     private final Host host;
     final Metrics m = new Metrics();
@@ -164,7 +169,7 @@ public class Dash extends View {
         ps.setStyle(Paint.Style.STROKE);
         arcGrad = new LinearGradient(60, 0, 420, 0, new int[]{CYAN, 0xFF9BE36A, AMBER, ORANGE}, new float[]{0, .55f, .75f, 1}, Shader.TileMode.CLAMP);
         buildIcons();
-        setBackgroundColor(BG);
+        setBackground(null);
         s.state = "idle"; s.bat = -1;
     }
 
@@ -319,7 +324,15 @@ public class Dash extends View {
 
     private float sx0;
     @Override public boolean onTouchEvent(MotionEvent e) {
-        if (e.getAction() == MotionEvent.ACTION_DOWN) { sx0 = e.getX(); return true; }
+        if (e.getAction() == MotionEvent.ACTION_DOWN) {
+            float x = e.getX() / sc, y = e.getY() / sc;
+            if (mapShown && mode == M_DASH && y > 52 && y < mapBottom()) {
+                if (x > 416 && y < 52 + 68) { host.mapZoom(1); return true; }
+                if (x > 416 && y > 52 + 68 && y < 52 + 124) { host.mapZoom(-1); return true; }
+                return false; // la carte reçoit le geste (déplacement, pincement)
+            }
+            sx0 = e.getX(); return true;
+        }
         if (e.getAction() == MotionEvent.ACTION_UP) {
             float dx = (e.getX() - sx0) / sc, x = e.getX() / sc, y = e.getY() / sc;
             if (learnStep >= 0) return true;
@@ -341,13 +354,20 @@ public class Dash extends View {
         H = getHeight() / sc;
         c.save();
         c.scale(sc, sc);
-        c.drawColor(BG);
 
+        float top = 52, bottom = H - 64;
+        double k0 = Math.min(1, (n - pageT) / 380.0);
+        boolean showMap = cur == P_MAP && k0 >= 1 && mode == M_DASH && !summary && learnStep < 0
+                && n >= confirmUntil && n - born > 3200 && host.mapReady();
+        if (showMap != mapShown) { mapShown = showMap; final boolean v = showMap; post(() -> host.setMapVisible(v)); }
+        c.save();
+        if (mapShown) c.clipRect(0, top, 480, mapBottom(), android.graphics.Region.Op.DIFFERENCE);
+        c.drawColor(BG);
         drawGlow(c, n);
+        c.restore();
         drawHeader(c);
 
         // pages (glissement)
-        float top = 52, bottom = H - 64;
         c.save();
         c.clipRect(0, top, 480, bottom);
         double k = Math.min(1, (n - pageT) / 380.0);
@@ -365,6 +385,64 @@ public class Dash extends View {
         c.restore();
 
         postInvalidateDelayed(33);
+    }
+
+    private boolean mapShown;
+    float mapBottom() { return H - 64 - 116; }
+
+    // ---------------------------------------------------------------- page carte
+
+    private void pageMap(Canvas c, float top, float bottom) {
+        float mb = mapBottom();
+        boolean live = mapShown && cur == P_MAP;
+        if (!live) {
+            pf.setColor(0xFF0B1118); c.drawRect(0, top, 480, mb, pf);
+            if (!host.mapReady()) {
+                text(c, "AUCUNE CARTE TROUVÉE", 240, (top + mb) / 2 - 30, bc7, 26, TXT, Paint.Align.CENTER, .05f);
+                text(c, "Copie un fichier .map (Mapsforge)", 240, (top + mb) / 2 + 6, b6, 16, MUTE, Paint.Align.CENTER, 0);
+                text(c, "dans le dossier NCT/maps du compteur", 240, (top + mb) / 2 + 30, b6, 16, MUTE, Paint.Align.CENTER, 0);
+                text(c, host.mapInfo(), 240, (top + mb) / 2 + 66, b6, 13, DIM, Paint.Align.CENTER, 0);
+            } else text(c, "CARTE", 240, (top + mb) / 2, bc7, 24, DIM, Paint.Align.CENTER, .2f);
+        } else {
+            // dégradés de lisibilité en haut et en bas de carte
+            pf.setShader(new LinearGradient(0, top, 0, top + 40, 0x99090E14, 0x00090E14, Shader.TileMode.CLAMP));
+            c.drawRect(0, top, 480, top + 40, pf);
+            pf.setShader(new LinearGradient(0, mb - 50, 0, mb, 0x00090E14, 0xCC090E14, Shader.TileMode.CLAMP));
+            c.drawRect(0, mb - 50, 480, mb, pf); pf.setShader(null);
+            // position : flèche orientée selon le cap (carte nord en haut), au centre de la vue carte
+            float px = 240, py = H / 2f;
+            c.save(); c.translate(px, py); c.rotate(s.bearing);
+            pf.setColor(0x5500E5C8); c.drawCircle(0, 0, 24, pf);
+            path.reset(); path.moveTo(0, -17); path.lineTo(12, 13); path.lineTo(0, 6); path.lineTo(-12, 13); path.close();
+            pf.setColor(0xFFFFFFFF); c.drawPath(path, pf);
+            ps.setColor(BG); ps.setStrokeWidth(2.5f); ps.setStrokeJoin(Paint.Join.ROUND); c.drawPath(path, ps);
+            c.restore();
+            // boutons zoom
+            zoomBtn(c, 420, top + 16, "+"); zoomBtn(c, 420, top + 72, "−");
+            // nord
+            pf.setColor(0xCC090E14); c.drawCircle(36, top + 40, 22, pf);
+            ps.setColor(LINE); ps.setStrokeWidth(1); c.drawCircle(36, top + 40, 22, ps);
+            path.reset(); path.moveTo(36, top + 24); path.lineTo(43, top + 42); path.lineTo(29, top + 42); path.close();
+            pf.setColor(ORANGE); c.drawPath(path, pf);
+            text(c, "N", 36, top + 56, bc7, 13, TXT, Paint.Align.CENTER, 0);
+        }
+        // bandeau de données
+        float t = mb + 6, w = (456 - 20) / 3f;
+        String[] lab = {"PUISSANCE 3S", "VITESSE", "DISTANCE"};
+        String[] val = {i0(v("pwr")), f1(v("spd")), String.format(Locale.US, "%.1f", v("dist"))};
+        String[] un = {"W", "KM/H", "KM"};
+        for (int i = 0; i < 3; i++) {
+            float l = 12 + i * (w + 10);
+            tile(c, l, t, l + w, bottom - 10, lab[i], null);
+            valUnit(c, l + 14, bottom - 26, val[i], 54, un[i]);
+        }
+        if (s.sPwr) { pf.setColor(zoneCol); rf.set(26, bottom - 18, 12 + w - 14, bottom - 14); c.drawRoundRect(rf, 2, 2, pf); }
+    }
+
+    private void zoomBtn(Canvas c, float x, float y, String l) {
+        pf.setColor(0xE60E151E); rf.set(x, y, x + 48, y + 48); c.drawRoundRect(rf, 12, 12, pf);
+        ps.setColor(LINE); ps.setStrokeWidth(1); c.drawRoundRect(rf, 12, 12, ps);
+        text(c, l, x + 24, y + 35, bc8, 32, TXT, Paint.Align.CENTER, 0);
     }
 
     private void drawGlow(Canvas c, long n) {
@@ -385,8 +463,8 @@ public class Dash extends View {
         }
         text(c, PAGES[cur], 240, 31, bc7, 20, TXT, Paint.Align.CENTER, .2f);
         // points
-        float x = 240 - (6 * 3 + 18 + 6 * 3) / 2f;
-        for (int i = 0; i < 4; i++) {
+        float x = 240 - (6 * (PAGES.length - 1) + 18 + 6 * (PAGES.length - 1)) / 2f;
+        for (int i = 0; i < PAGES.length; i++) {
             float w = i == cur ? 18 : 6;
             pf.setColor(i == cur ? CYAN : 0xFF2A3746);
             rf.set(x, 38, x + w, 44); c.drawRoundRect(rf, 3, 3, pf);
@@ -444,8 +522,9 @@ public class Dash extends View {
     private void drawPage(Canvas c, int i, float top, float bottom) {
         switch (i) {
             case 0: pageLive(c, top, bottom); break;
-            case 1: pageEffort(c, top, bottom); break;
-            case 2: pageClimb(c, top, bottom); break;
+            case 1: pageMap(c, top, bottom); break;
+            case 2: pageEffort(c, top, bottom); break;
+            case 3: pageClimb(c, top, bottom); break;
             default: pageLap(c, top, bottom); break;
         }
     }
