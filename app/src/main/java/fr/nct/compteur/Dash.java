@@ -964,7 +964,7 @@ public class Dash extends View {
 
     private void drawOverlays(Canvas c, long n) {
         // bandeau pause : rappel des actions
-        if ((state.equals("pause") || state.equals("auto")) && mode == M_DASH && n >= confirmUntil && !summary) {
+        if ((state.equals("pause") || state.equals("auto")) && mode == M_DASH && n >= confirmUntil && !summary && !pauseMenu) {
             float y = H - 64 - 58;
             pf.setColor(0xF2120E06); rf.set(12, y, 468, y + 50); c.drawRoundRect(rf, 14, 14, pf);
             ps.setColor(AMBER); ps.setStrokeWidth(2); c.drawRoundRect(rf, 14, 14, ps);
