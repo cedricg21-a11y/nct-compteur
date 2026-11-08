@@ -42,6 +42,12 @@ public class Ride implements Ble.Listener, LocationListener, SensorEventListener
         public double lat = Double.NaN, lon = Double.NaN; public float bearing;
     }
     private float lastBearing = 0;
+    // cap : GPS en mouvement, sinon déplacement, sinon boussole
+    private Location bearingRef;
+    private long lastMoveBearingT = 0;
+    private float compass = Float.NaN;
+    private final float[] rotM = new float[9], orient = new float[3], grav = new float[3], mag = new float[3];
+    private boolean hasGrav, hasMag;
 
     public interface Ui {
         void sample(Sample s);
@@ -91,6 +97,17 @@ public class Ride implements Ble.Listener, LocationListener, SensorEventListener
         SensorManager sm = (SensorManager) ctx.getSystemService(Context.SENSOR_SERVICE);
         Sensor p = sm != null ? sm.getDefaultSensor(Sensor.TYPE_PRESSURE) : null;
         if (p != null) { hasBaro = true; sm.registerListener(this, p, SensorManager.SENSOR_DELAY_NORMAL); }
+        if (sm != null) {
+            Sensor rv = sm.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
+            if (rv != null) sm.registerListener(this, rv, SensorManager.SENSOR_DELAY_UI);
+            else {
+                Sensor acc = sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), mg = sm.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
+                if (acc != null && mg != null) {
+                    sm.registerListener(this, acc, SensorManager.SENSOR_DELAY_UI);
+                    sm.registerListener(this, mg, SensorManager.SENSOR_DELAY_UI);
+                }
+            }
+        }
         h.post(tick);
     }
 
@@ -146,8 +163,9 @@ public class Ride implements Ble.Listener, LocationListener, SensorEventListener
         s.sPwr = ble.pwrOk(); s.sHr = ble.hrOk(); s.sGps = gpsFix; s.sCsc = ble.cscOk();
         if (last != null && gpsFix) {
             s.lat = last.getLatitude(); s.lon = last.getLongitude();
-            if (last.hasBearing() && last.getSpeed() > 1.5) lastBearing = last.getBearing();
         }
+        // à l'arrêt / basse vitesse sans cap récent : boussole interne
+        if (System.currentTimeMillis() - lastMoveBearingT > 4000 && !Float.isNaN(compass)) lastBearing = compass;
         s.bearing = lastBearing;
         ui.sample(s);
     }
@@ -273,6 +291,12 @@ public class Ride implements Ble.Listener, LocationListener, SensorEventListener
     }
 
     @Override public void onLocationChanged(Location l) {
+        // cap de déplacement
+        if (l.hasBearing() && l.getSpeed() > 1.0f) { lastBearing = l.getBearing(); lastMoveBearingT = System.currentTimeMillis(); bearingRef = l; }
+        else if (bearingRef == null) bearingRef = l;
+        else if (bearingRef.distanceTo(l) >= 8 && l.getAccuracy() < 25) {
+            lastBearing = (bearingRef.bearingTo(l) + 360) % 360; lastMoveBearingT = System.currentTimeMillis(); bearingRef = l;
+        }
         if (l.getAccuracy() > 50) return;
         boolean firstFix = !gpsFix;
         gpsFix = true; lastFixMs = System.currentTimeMillis();
@@ -293,6 +317,23 @@ public class Ride implements Ble.Listener, LocationListener, SensorEventListener
     @Override public void onProviderEnabled(String p) {}
     @Override public void onProviderDisabled(String p) {}
 
-    @Override public void onSensorChanged(SensorEvent e) { pressure = e.values[0]; }
+    @Override public void onSensorChanged(SensorEvent e) {
+        int t = e.sensor.getType();
+        if (t == Sensor.TYPE_PRESSURE) { pressure = e.values[0]; return; }
+        boolean ok = false;
+        if (t == Sensor.TYPE_ROTATION_VECTOR) { SensorManager.getRotationMatrixFromVector(rotM, e.values); ok = true; }
+        else {
+            if (t == Sensor.TYPE_ACCELEROMETER) { lowPass(e.values, grav); hasGrav = true; }
+            if (t == Sensor.TYPE_MAGNETIC_FIELD) { lowPass(e.values, mag); hasMag = true; }
+            ok = hasGrav && hasMag && SensorManager.getRotationMatrix(rotM, null, grav, mag);
+        }
+        if (!ok) return;
+        SensorManager.getOrientation(rotM, orient);
+        float az = (float) ((Math.toDegrees(orient[0]) + 360) % 360);
+        if (Float.isNaN(compass)) compass = az;
+        else { float d = ((az - compass + 540) % 360) - 180; compass = (compass + d * 0.15f + 360) % 360; }
+    }
+
+    private static void lowPass(float[] in, float[] out) { for (int i = 0; i < 3; i++) out[i] += (in[i] - out[i]) * 0.2f; }
     @Override public void onAccuracyChanged(Sensor s, int a) {}
 }

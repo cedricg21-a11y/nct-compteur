@@ -443,6 +443,7 @@ public class Dash extends View {
     }
 
     private boolean mapShown;
+    private float shownBearing = 0;
     float mapBottom() { return H - 64 - 116; }
 
     // ---------------------------------------------------------------- page carte
@@ -469,7 +470,9 @@ public class Dash extends View {
             float[] mp = host.mapPos();
             if (mp != null) { px = mp[0] / sc; py = mp[1] / sc; }
             drawWindRing(c, px, py);
-            c.save(); c.translate(px, py); c.rotate(s.bearing);
+            float db = ((s.bearing - shownBearing + 540) % 360) - 180;
+            shownBearing = (shownBearing + db * 0.2f + 360) % 360;
+            c.save(); c.translate(px, py); c.rotate(shownBearing);
             pf.setColor(0x5500E5C8); c.drawCircle(0, 0, 24, pf);
             path.reset(); path.moveTo(0, -17); path.lineTo(12, 13); path.lineTo(0, 6); path.lineTo(-12, 13); path.close();
             pf.setColor(0xFFFFFFFF); c.drawPath(path, pf);
