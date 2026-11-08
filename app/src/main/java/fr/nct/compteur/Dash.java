@@ -70,7 +70,7 @@ public class Dash extends View {
     public void openMenu() { backMode = (mode == M_HOME) ? M_HOME : M_DASH; mode = M_MENU; sel = 0; invalidate(); }
     public void goHome() { mode = M_HOME; homeSel = 0; rides = host.rides(); invalidate(); }
     public void goDash() { mode = M_DASH; invalidate(); }
-    public void openMode(int md) { mode = md; sel = 0; if (md == M_SENS) host.setKeepScanning(true); invalidate(); }
+    public void openMode(int md) { mode = md; sel = 0; if (md == M_SENS) host.setKeepScanning(true); if (md == M_HIST) rides = host.rides(); invalidate(); }
 
     private void menuButton(String b) {
         if (mode == M_MENU) {
