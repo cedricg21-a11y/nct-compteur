@@ -57,7 +57,7 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
         wind = new Wind(this);
         sounds = new android.media.SoundPool.Builder().setMaxStreams(2)
                 .setAudioAttributes(new android.media.AudioAttributes.Builder()
-                        .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                        .setUsage(android.media.AudioAttributes.USAGE_ALARM)
                         .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION).build()).build();
         bellId = sounds.load(this, R.raw.bell, 1);
         dash = new Dash(this, this);
@@ -229,12 +229,12 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
         if (sounds == null || pct <= 0) return;
         try {
             android.media.AudioManager am = (android.media.AudioManager) getSystemService(AUDIO_SERVICE);
-            int max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC);
-            if (savedVol < 0) savedVol = am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC);
-            am.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, max, 0);
+            int max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_ALARM);
+            if (savedVol < 0) savedVol = am.getStreamVolume(android.media.AudioManager.STREAM_ALARM);
+            am.setStreamVolume(android.media.AudioManager.STREAM_ALARM, max, 0);
             bellH.removeCallbacksAndMessages(null);
             bellH.postDelayed(() -> {
-                try { if (savedVol >= 0) am.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, savedVol, 0); } catch (Exception ignored) {}
+                try { if (savedVol >= 0) am.setStreamVolume(android.media.AudioManager.STREAM_ALARM, savedVol, 0); } catch (Exception ignored) {}
                 savedVol = -1;
             }, 1600);
         } catch (Exception ignored) {}
