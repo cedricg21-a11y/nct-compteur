@@ -711,35 +711,52 @@ public class Dash extends View {
     private final java.util.HashSet<Integer> radarSeen = new java.util.HashSet<>();
     private long radarFlashT;
 
-    /** bande radar sur le bord droit : véhicules positionnés selon leur distance (0 en bas, 140 m en haut) */
+    /**
+     * Radar : au repos, fine ligne verte sur le bord droit (radar connecté, route libre).
+     * Véhicule détecté : large bande colorée avec les véhicules placés selon leur distance (0 en bas, 140 m en haut),
+     * halo sur tout le bord droit et bandeau du véhicule le plus proche.
+     */
     private void drawRadar(Canvas c, long n) {
         if (!s.sRadar) return;
-        float t = HDR + 8, b = H - BAND - 8, x0 = 472, x1 = 478;
+        float t = HDR + 6, b = H - BAND - 6;
         int cnt = s.rDist.length;
-        boolean danger = false;
-        for (int i = 0; i < cnt; i++) if (s.rDist[i] < 40) danger = true;
-        int col = cnt == 0 ? 0x5500E5C8 : danger ? 0xFFE85022 : 0xFFFFB02E;
-        if (cnt > 0) {
-            // halo sur le bord droit
-            pf.setShader(new LinearGradient(480 - 60, 0, 480, 0, 0x00000000, alpha(col, 110), Shader.TileMode.CLAMP));
-            c.drawRect(420, t, 480, b, pf); pf.setShader(null);
+        if (cnt == 0) {
+            pf.setColor(0x9900E5C8); rf.set(474, t, 480, b); c.drawRoundRect(rf, 3, 3, pf);
+            return;
         }
-        pf.setColor(cnt == 0 ? 0x3300E5C8 : alpha(col, 90)); rf.set(x0, t, x1, b); c.drawRoundRect(rf, 5, 5, pf);
-        // vélo en bas
-        pf.setColor(TXT); c.drawCircle((x0 + x1) / 2, b - 6, 5, pf);
+        int near = 999; for (int d : s.rDist) near = Math.min(near, d);
+        boolean danger = near < 40;
+        int col = danger ? ORANGE : AMBER;
+        boolean pulse = (n / 250) % 2 == 0;
+        // halo
+        pf.setShader(new LinearGradient(330, 0, 480, 0, 0x00000000, alpha(col, danger && pulse ? 170 : 120), Shader.TileMode.CLAMP));
+        c.drawRect(330, t, 480, b, pf); pf.setShader(null);
+        // bande large
+        float x0 = 440, x1 = 480;
+        pf.setColor(0xE606090D); rf.set(x0, t, x1 + 10, b); c.drawRoundRect(rf, 10, 10, pf);
+        pf.setColor(alpha(col, 70)); c.drawRoundRect(rf, 10, 10, pf);
+        ps.setColor(col); ps.setStrokeWidth(3); rf.set(x0 + 1.5f, t + 1.5f, x1 + 10, b - 1.5f); c.drawRoundRect(rf, 10, 10, ps);
+        // repères de distance
+        for (int dm = 50; dm <= 100; dm += 50) {
+            float y = b - 20 - dm / 140f * (b - t - 40);
+            pf.setColor(alpha(col, 120)); c.drawRect(x0 + 8, y, x1 - 4, y + 2, pf);
+        }
+        // vélo
+        pf.setColor(TXT); rf.set(x0 + 12, b - 26, x1 - 8, b - 8); c.drawRoundRect(rf, 5, 5, pf);
+        // véhicules
         for (int i = 0; i < cnt; i++) {
-            float y = b - 14 - Math.min(140, s.rDist[i]) / 140f * (b - t - 24);
+            float y = b - 40 - Math.min(140, s.rDist[i]) / 140f * (b - t - 60);
             int cc = s.rDist[i] < 40 ? ORANGE : AMBER;
-            pf.setColor(cc); rf.set(x0 - 9, y - 11, x1 + 1, y + 11); c.drawRoundRect(rf, 4, 4, pf);
-            ps.setColor(BG2); ps.setStrokeWidth(2); c.drawRoundRect(rf, 4, 4, ps);
+            pf.setColor(cc); rf.set(x0 + 6, y - 18, x1 - 2, y + 18); c.drawRoundRect(rf, 7, 7, pf);
+            pf.setColor(alpha(BG2, 200)); rf.set(x0 + 11, y - 12, x1 - 7, y - 4); c.drawRoundRect(rf, 3, 3, pf); // pare-brise
+            text(c, String.valueOf(s.rDist[i]), (x0 + x1) / 2 + 2, y + 13, bc8, 15, BG2, Paint.Align.CENTER, 0);
         }
-        if (cnt > 0) {
-            String lbl = cnt + (cnt > 1 ? " VÉHICULES" : " VÉHICULE");
-            pt.setTypeface(bc8); pt.setTextSize(16); pt.setLetterSpacing(.06f);
-            float w = pt.measureText(lbl) + 20;
-            pf.setColor(col); rf.set(460 - w, t, 460, t + 28); c.drawRoundRect(rf, 14, 14, pf);
-            text(c, lbl, 460 - w / 2, t + 20, bc8, 16, BG, Paint.Align.CENTER, .06f);
-        }
+        // bandeau
+        String lbl = (cnt > 1 ? cnt + " VÉHICULES · " : "VÉHICULE · ") + near + " m";
+        pt.setTypeface(bc8); pt.setTextSize(22); pt.setLetterSpacing(.04f);
+        float w = pt.measureText(lbl) + 28;
+        pf.setColor(col); rf.set(432 - w, t + 4, 432, t + 42); c.drawRoundRect(rf, 19, 19, pf);
+        text(c, lbl, 432 - w / 2, t + 31, bc8, 22, BG, Paint.Align.CENTER, .04f);
     }
 
     /** à chaque échantillon : bip quand un nouveau véhicule apparaît */

@@ -69,6 +69,7 @@ jobs:
             adb shell pm grant fr.nct.compteur android.permission.READ_EXTERNAL_STORAGE ; adb shell pm grant fr.nct.compteur android.permission.WRITE_EXTERNAL_STORAGE ; adb shell pm grant fr.nct.compteur android.permission.ACCESS_FINE_LOCATION
             adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 -e splash 1 ; sleep 2 ; adb exec-out screencap -p > shots/0-splash.png
             adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 1000 --ei page 0 ; sleep 4 ; adb exec-out screencap -p > shots/1-live.png
+            adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 992 --ei page 0 ; sleep 4 ; adb exec-out screencap -p > shots/1c-radar.png
             adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 1000 --ei page 1 ; sleep 12 ; adb exec-out screencap -p > shots/1b-carte.png
             adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 2600 --ei page 2 ; sleep 4 ; adb exec-out screencap -p > shots/2-effort.png
             adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 1500 --ei page 3 ; sleep 4 ; adb exec-out screencap -p > shots/3-grimpee.png
