@@ -77,7 +77,7 @@ public class Dash extends View {
     static final String[] MENU = {"CAPTEURS", "PROFIL", "SORTIE", "ÉCRAN ET SONS", "CONNEXIONS", "BOUTONS", "QUITTER"};
     static final String[][] SUB = {
             {"PAUSE AUTOMATIQUE"},
-            {"LUMINOSITÉ", "BOUTON MARCHE", "SONNETTE", "ALERTES RADAR"},
+            {"LUMINOSITÉ", "SONNETTE", "ALERTES RADAR"},
             {"WI-FI", "BLUETOOTH", "PARAMÈTRES ANDROID"}};
     static final String[] SUBT = {"SORTIE", "ÉCRAN ET SONS", "CONNEXIONS"};
     static final int M_SUB = 6;
@@ -178,8 +178,7 @@ public class Dash extends View {
                 int curB = host.brightness(), k = 0;
                 for (int j = 0; j < BRIGHT.length; j++) if (BRIGHT[j] == curB) k = j;
                 host.setBrightness(BRIGHT[(k + 1) % BRIGHT.length]);
-            } else if (i == 1) host.setBlockSleep(!host.blockSleep());
-            else if (i == 2) {
+            } else if (i == 1) {
                 int cb = host.bellVolume(), k = 0;
                 for (int j = 0; j < BELL.length; j++) if (BELL[j] == cb) k = j;
                 host.setBellVolume(BELL[(k + 1) % BELL.length]);
@@ -197,8 +196,7 @@ public class Dash extends View {
         if (id == 0) return host.autoPause() ? "ACTIVÉE" : "DÉSACTIVÉE";
         if (id == 1) {
             if (i == 0) { int b = host.brightness(); return b < 0 ? "AUTO" : b + " %"; }
-            if (i == 1) return host.blockSleep() ? "VEILLE BLOQUÉE" : "VEILLE ACTIVE";
-            if (i == 2) return host.bellVolume() > 0 ? host.bellVolume() + " %" : "COUPÉE";
+            if (i == 1) return host.bellVolume() > 0 ? host.bellVolume() + " %" : "COUPÉE";
             return host.radarSound() ? "SON ACTIVÉ" : "SON COUPÉ";
         }
         return "›";

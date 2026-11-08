@@ -40,14 +40,6 @@ public class RideService extends Service {
                         new android.os.Handler().postDelayed(() -> Ride.get(RideService.this).recover(true), 1500);
                         return;
                     }
-                    if (!getSharedPreferences("cfg", MODE_PRIVATE).getBoolean("blockSleep", true)) return;
-                    PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
-                    @SuppressWarnings("deprecation")
-                    PowerManager.WakeLock w = pm.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP, "nct:wake");
-                    w.acquire(3000);
-                    Intent a = new Intent(RideService.this, MainActivity.class);
-                    a.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
-                    try { startActivity(a); } catch (Exception ignored) {}
                 }
             };
             android.content.IntentFilter f = new android.content.IntentFilter(Intent.ACTION_SCREEN_OFF);
