@@ -711,7 +711,7 @@ public class Dash extends View {
     }
 
     private void drawSummary(Canvas c) {
-        pf.setColor(0xFA090E14); c.drawRect(0, 0, 480, H, pf);
+        pf.setColor(BG); c.drawRect(0, 0, 480, H, pf);
         drawGlowStatic(c);
         text(c, "SORTIE TERMINÉE", 240, 92, bc8, 44, TXT, Paint.Align.CENTER, .04f);
         brand(c, 140, 108, 340, 112);
