@@ -52,6 +52,7 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
         setContentView(dash);
 
         ride = Ride.get(this);
+        ride.autoPause = cfg.getBoolean("autopause", true);
         if (getIntent().getStringExtra("demo") != null) { startDemo(); return; }
         ride.attach(this);
         askPermissions();
@@ -222,6 +223,13 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
 
     @Override public void saveCfg(int ftp, int hrMax, double weight) {
         cfg.edit().putInt("ftp", ftp).putInt("hrMax", hrMax).putFloat("weight", (float) weight).apply();
+    }
+
+    private boolean simAuto = true;
+    @Override public boolean autoPause() { return sim != null ? simAuto : ride.autoPause; }
+    @Override public void setAutoPause(boolean on) {
+        if (sim != null) { simAuto = on; return; }
+        ride.autoPause = on; cfg.edit().putBoolean("autopause", on).apply();
     }
 
     @Override public void openAndroidSettings() {

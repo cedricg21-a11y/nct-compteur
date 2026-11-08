@@ -37,6 +37,8 @@ public class Dash extends View {
         void toggleSensor(Ble.Found f);
         void setKeepScanning(boolean on);
         void saveCfg(int ftp, int hrMax, double weight);
+        boolean autoPause();
+        void setAutoPause(boolean on);
         void openAndroidSettings();
         void quitApp();
     }
@@ -70,9 +72,9 @@ public class Dash extends View {
                 else if (b.equals("prev")) adjust(-1);
                 else { profEdit = false; host.saveCfg(m.ftp, m.hrMax, m.weight); }
             } else {
-                if (b.equals("next")) profSel = (profSel + 1) % 3;
-                else if (b.equals("prev")) profSel = (profSel + 2) % 3;
-                else if (b.equals("startstop")) profEdit = true;
+                if (b.equals("next")) profSel = (profSel + 1) % 4;
+                else if (b.equals("prev")) profSel = (profSel + 3) % 4;
+                else if (b.equals("startstop")) { if (profSel == 3) host.setAutoPause(!host.autoPause()); else profEdit = true; }
                 else if (b.equals("lap")) { host.saveCfg(m.ftp, m.hrMax, m.weight); mode = M_MENU; sel = 1; }
             }
         }
@@ -179,7 +181,8 @@ public class Dash extends View {
         String was = state;
         s = x; state = x.state;
         if (!state.equals(was) && !quiet) {
-            if (state.equals("rec")) toast(was.equals("pause") ? "REPRISE" : "C'EST PARTI !", CYAN);
+            if (state.equals("rec")) toast(was.equals("pause") || was.equals("auto") ? "REPRISE" : "C'EST PARTI !", CYAN);
+            else if (state.equals("auto")) toast("PAUSE AUTO", AMBER);
             else if (state.equals("pause")) toast("PAUSE", AMBER);
         }
         m.push(x.p, x.hr, x.cad, x.spd, x.alt, x.dist, state.equals("rec"));
@@ -242,7 +245,7 @@ public class Dash extends View {
                     lapFlashN = String.valueOf(p.n + 1);
                     lapFlashS = ms(p.t) + "  ·  " + Math.round(p.ap()) + " W  ·  " + f1(p.spd()) + " km/h";
                     lapFlashT = now();
-                } else if (state.equals("pause")) {
+                } else if (state.equals("pause") || state.equals("auto")) {
                     if (confirmed("finish")) {
                         // résumé de la sortie avant remise à zéro
                         sumTime = ms(s.elapsed); sumDist = String.format(Locale.US, "%.2f", m.dist / 1000);
@@ -409,14 +412,15 @@ public class Dash extends View {
         pf.setColor(0xE6090E14); c.drawRect(0, y, 480, H, pf);
         pf.setColor(LINE); c.drawRect(0, y, 480, y + 1, pf);
         // pastille d'état
-        int col = state.equals("rec") ? ORANGE : state.equals("pause") ? AMBER : 0xFF2A3746;
+        boolean paused = state.equals("pause") || state.equals("auto");
+        int col = state.equals("rec") ? ORANGE : paused ? AMBER : 0xFF2A3746;
         ps.setColor(col); ps.setStrokeWidth(2);
         rf.set(17, y + 16, 125, y + 48); c.drawRoundRect(rf, 16, 16, ps);
         boolean on = !state.equals("rec") || (now() / 600) % 2 == 0;
         pf.setColor(state.equals("idle") ? 0xFF3A4858 : on ? col : (col & 0x40FFFFFF));
         c.drawCircle(35, y + 32, 6, pf);
-        String l = state.equals("rec") ? "REC" : state.equals("pause") ? "PAUSE" : "PRÊT";
-        text(c, l, 49, y + 39, bc7, 18, state.equals("rec") ? TXT : state.equals("pause") ? AMBER : MUTE, Paint.Align.LEFT, .11f);
+        String l = state.equals("rec") ? "REC" : state.equals("auto") ? "AUTO" : state.equals("pause") ? "PAUSE" : "PRÊT";
+        text(c, l, 49, y + 39, bc7, 18, state.equals("rec") ? TXT : paused ? AMBER : MUTE, Paint.Align.LEFT, .11f);
         text(c, hms(s.elapsed), 240, y + 45, bc7, 38, TXT, Paint.Align.CENTER, .01f);
         java.util.Calendar cal = java.util.Calendar.getInstance();
         text(c, String.format(Locale.US, "%02d:%02d", cal.get(java.util.Calendar.HOUR_OF_DAY), cal.get(java.util.Calendar.MINUTE)),
@@ -659,11 +663,11 @@ public class Dash extends View {
 
     private void drawOverlays(Canvas c, long n) {
         // bandeau pause : rappel des actions
-        if (state.equals("pause") && mode == M_DASH && n >= confirmUntil && !summary) {
+        if ((state.equals("pause") || state.equals("auto")) && mode == M_DASH && n >= confirmUntil && !summary) {
             float y = H - 64 - 58;
             pf.setColor(0xF2120E06); rf.set(12, y, 468, y + 50); c.drawRoundRect(rf, 14, 14, pf);
             ps.setColor(AMBER); ps.setStrokeWidth(2); c.drawRoundRect(rf, 14, 14, ps);
-            text(c, "START  reprendre", 128, y + 32, bc7, 20, AMBER, Paint.Align.CENTER, .06f);
+            text(c, state.equals("auto") ? "REPARS = REPRISE" : "START  reprendre", 128, y + 32, bc7, 20, AMBER, Paint.Align.CENTER, .06f);
             pf.setColor(0x66FFB02E); c.drawRect(239, y + 12, 241, y + 38, pf);
             text(c, "TOUR  terminer", 354, y + 32, bc7, 20, TXT, Paint.Align.CENTER, .06f);
         }
@@ -831,9 +835,9 @@ public class Dash extends View {
             }
         } else if (mode == M_PROF) {
             panelHeader(c, "PROFIL", profEdit ? "▲▼ modifier  ·  START valider" : "▲▼ choisir  ·  START modifier  ·  TOUR retour");
-            String[] lab = {"FTP", "FC MAX", "POIDS"};
-            String[] val = {m.ftp + " W", m.hrMax + " bpm", String.format(Locale.US, "%.1f kg", m.weight)};
-            for (int i = 0; i < 3; i++) {
+            String[] lab = {"FTP", "FC MAX", "POIDS", "PAUSE AUTOMATIQUE"};
+            String[] val = {m.ftp + " W", m.hrMax + " bpm", String.format(Locale.US, "%.1f kg", m.weight), host.autoPause() ? "ACTIVÉE" : "DÉSACTIVÉE"};
+            for (int i = 0; i < 4; i++) {
                 boolean on = i == profSel;
                 float t = ROW0 + i * 110 - 30, b = t + 100;
                 pf.setColor(on ? 0xFF13202B : TILE); rf.set(12, t, 468, b); c.drawRoundRect(rf, 14, 14, pf);
@@ -848,7 +852,7 @@ public class Dash extends View {
                     text(c, "+", 428, t + 70, bc8, 40, BG, Paint.Align.CENTER, 0);
                 }
             }
-            float y = ROW0 + 3 * 110 + 10;
+            float y = ROW0 + 4 * 110 + 4;
             text(c, "Rapport FTP / poids : " + f1(m.ftp / m.weight) + " W/kg", 240, y, b6, 18, MUTE, Paint.Align.CENTER, 0);
             text(c, "Zones de puissance et de FC recalculées automatiquement.", 240, y + 28, b6, 14, DIM, Paint.Align.CENTER, 0);
         }
@@ -867,7 +871,8 @@ public class Dash extends View {
             }
         } else if (mode == M_PROF) {
             int i = (int) Math.floor((y - (ROW0 - 30)) / 110);
-            if (i >= 0 && i < 3) {
+            if (i == 3) { profSel = 3; profEdit = false; host.setAutoPause(!host.autoPause()); }
+            else if (i >= 0 && i < 3) {
                 if (profEdit && i == profSel && x > 326) adjust(x < 394 ? -1 : 1);
                 else if (profEdit && i == profSel) { profEdit = false; host.saveCfg(m.ftp, m.hrMax, m.weight); }
                 else { profSel = i; profEdit = true; }

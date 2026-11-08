@@ -53,7 +53,9 @@ public class Ride implements Ble.Listener, LocationListener, SensorEventListener
     private boolean started;
 
     // état
-    String state = "idle"; // idle | rec | pause
+    String state = "idle"; // idle | rec | pause | auto (pause automatique)
+    public boolean autoPause = true;
+    private int slowCount = 0;
     long timerS = 0, startMs = 0;
     double distM = 0;
 
@@ -108,6 +110,19 @@ public class Ride implements Ble.Listener, LocationListener, SensorEventListener
         double spd = speedKmh();
         double alt = altitude();
         int p = ble.power, hr = ble.heartRate, cad = ble.cadence;
+
+        // pause automatique : arrêt > 3 s (vitesse connue via GPS ou capteur de roue)
+        boolean speedKnown = gpsFix || (ble.cscOk() && ble.wheelSpeedKmh >= 0);
+        if (autoPause && speedKnown && state.equals("rec")) {
+            slowCount = spd < 2.5 ? slowCount + 1 : 0;
+            if (slowCount >= 3) {
+                state = "auto"; slowCount = 0;
+                try { if (fit != null) fit.event(now, 4); } catch (Exception ignored) {}
+            }
+        } else if (state.equals("auto") && (spd > 4 || !autoPause)) {
+            state = "rec"; lastForDist = null;
+            try { if (fit != null) fit.event(now, 0); } catch (Exception ignored) {}
+        }
 
         if (state.equals("rec")) {
             timerS++; lapTimer++;
@@ -182,8 +197,10 @@ public class Ride implements Ble.Listener, LocationListener, SensorEventListener
             }
             state = "rec";
             ctx.startService(new Intent(ctx, RideService.class));
-        } else if (state.equals("rec")) {
+        } else if (state.equals("rec") || state.equals("auto")) {
+            boolean wasRec = state.equals("rec");
             state = "pause";
+            if (!wasRec) { step(now); return; }
             try { if (fit != null) fit.event(now, 4); } catch (Exception ignored) {}
         } else {
             state = "rec";
