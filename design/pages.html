@@ -117,10 +117,10 @@ body{background:#1b1b1b;display:flex;gap:26px;padding:44px 20px 20px;font-family
 <!-- GRIMPÉE -->
 <div class="w"><div class="cap">GRIMPÉE</div><div class="s">
   <div data-t="hdr"></div>
-  <div style="position:relative;height:330px;flex:none">
+  <div style="position:relative;height:392px;flex:none">
     <div style="position:absolute;left:16px;top:6px"><div class="lab">PENTE</div><div class="num" style="font-size:104px;color:#ffd23e">6.2<span style="font-size:40px">%</span></div></div>
     <div style="position:absolute;right:16px;top:6px;text-align:right"><div class="lab">VAM</div><div class="num" style="font-size:52px">1 080</div><div class="lab" style="margin-top:12px">ALTITUDE</div><div class="num" style="font-size:52px">412<span class="u"> m</span></div></div>
-    <svg id="prof" width="480" height="190" style="position:absolute;left:0;bottom:0"></svg>
+    <svg id="prof" width="480" height="230" style="position:absolute;left:0;bottom:0"></svg>
   </div>
   <div class="sec" style="padding:8px 16px 10px">
     <div style="display:flex;justify-content:space-between"><span class="lab">MONTÉE EN COURS</span><span class="lab"><b>1.8 km</b> restants · <b>112 m</b></span></div>
@@ -141,22 +141,25 @@ body{background:#1b1b1b;display:flex;gap:26px;padding:44px 20px 20px;font-family
 <!-- TOUR -->
 <div class="w"><div class="cap">TOUR</div><div class="s">
   <div data-t="hdr"></div>
-  <div style="flex:none;height:168px;padding:6px 16px 0;position:relative">
-    <div class="lab">TOUR <b style="color:#00e5c8">3</b> · 31.2 km</div>
-    <div class="num" style="font-size:118px;margin-top:6px">13:27</div>
-    <div style="position:absolute;right:16px;top:10px;text-align:right"><div class="lab">TOUR PRÉC.</div><div class="num" style="font-size:34px;color:#6c7d90">14:02</div><div style="font-family:BC;font-weight:700;font-size:18px;color:#00e5c8;margin-top:6px">▲ 35 s plus vite</div></div>
+  <div style="flex:none;height:206px;padding:6px 16px 0;position:relative">
+    <div class="lab">VITESSE MOYENNE · TOUR <b style="color:#00e5c8">4</b></div>
+    <div class="num" style="font-size:140px;margin-top:8px">33.42<span class="u" style="font-size:24px"> km/h</span></div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:10px">
+      <span style="font-family:BC;font-weight:800;font-size:26px;color:#00e5c8">▲ +1.18 km/h</span>
+      <span class="lab">TOUR 3 · <b>32.24</b></span>
+    </div>
   </div>
-  <div class="sec" style="padding:8px 16px 10px">
-    <div class="lab">PUISSANCE MOYENNE PAR TOUR</div>
-    <svg id="laps" width="448" height="96" style="margin-top:6px"></svg>
+  <div class="sec" style="padding:8px 16px 4px">
+    <div class="lab">VITESSE MOYENNE PAR TOUR</div>
+    <svg id="laps" width="448" height="214" style="margin-top:6px"></svg>
   </div>
   <div class="grid r2 sec">
-    <div class="c"><div class="lab">PUISS. MOY</div><div class="num">246</div><div class="d" style="color:#00e5c8">▲12</div></div>
-    <div class="c ce"><div class="lab">NP</div><div class="num">258</div></div>
-    <div class="c ri"><div class="lab">FC MOY</div><div class="num">158</div><div class="d" style="left:14px;right:auto;color:#e85022">▲4</div></div>
-    <div class="c"><div class="lab">VITESSE</div><div class="num">33.4</div><div class="d" style="color:#00e5c8">▲1.2</div></div>
+    <div class="c"><div class="lab">TEMPS TOUR</div><div class="num">13:27</div></div>
+    <div class="c ce"><div class="lab">DISTANCE</div><div class="num">7.48</div></div>
+    <div class="c ri"><div class="lab">PUISS. MOY</div><div class="num">246</div></div>
+    <div class="c"><div class="lab">FC MOY</div><div class="num">158</div></div>
     <div class="c ce"><div class="lab">CADENCE</div><div class="num">88</div></div>
-    <div class="c ri"><div class="lab">DISTANCE</div><div class="num">7.48</div></div>
+    <div class="c ri"><div class="lab">VIT. GLOBALE</div><div class="num">29.88</div></div>
   </div>
   <div style="flex:1"></div>
   <div data-t="band"></div>
@@ -168,10 +171,10 @@ var ZC=['#5f7a94','#00e5c8','#9be36a','#ffd23e','#ffb02e','#ff7a2e','#e85022'];
 // anneau W'bal segmenté
 (function(){var h='',n=40,r=118;for(var i=0;i<n;i++){var a0=(-90+i*360/n+1.5)*Math.PI/180,a1=(-90+(i+1)*360/n-1.5)*Math.PI/180,on=i<8;h+='<path d="M'+(r*Math.cos(a0)).toFixed(1)+' '+(r*Math.sin(a0)).toFixed(1)+' A'+r+' '+r+' 0 0 1 '+(r*Math.cos(a1)).toFixed(1)+' '+(r*Math.sin(a1)).toFixed(1)+'" fill="none" stroke="'+(on?'#e85022':'#1a2532')+'" stroke-width="26"/>'}document.getElementById('wb').innerHTML=h})();
 // liste zones
-(function(){var t=['0:07','0:43','0:36','0:25','0:15','0:08','0:04'],n=['Z1','Z2','Z3','Z4','Z5','Z6','Z7'],w=[5,31,26,18,11,6,3],h='';for(var i=0;i<7;i++)h+='<div style="display:flex;align-items:center;height:22px;font-family:BC;font-weight:700;font-size:16px"><span style="width:34px;color:'+ZC[i]+'">'+n[i]+'</span><span style="flex:1;height:6px;background:#141d27;border-radius:3px;margin-right:12px;position:relative"><i style="position:absolute;left:0;top:0;bottom:0;width:'+(w[i]/31*100)+'%;background:'+ZC[i]+';border-radius:3px"></i></span><span style="width:46px;text-align:right;color:'+(i==4?'#eef3f7':'#6c7d90')+'">'+t[i]+'</span></div>';document.getElementById('zl').innerHTML=h})();
+(function(){var t=['0:07','0:43','0:36','0:25','0:15','0:08','0:04'],n=['Z1','Z2','Z3','Z4','Z5','Z6','Z7'],w=[5,31,26,18,11,6,3],h='';for(var i=0;i<7;i++)h+='<div style="display:flex;align-items:center;height:27px;font-family:BC;font-weight:700;font-size:18px"><span style="width:34px;color:'+ZC[i]+'">'+n[i]+'</span><span style="flex:1;height:8px;background:#141d27;border-radius:3px;margin-right:12px;position:relative"><i style="position:absolute;left:0;top:0;bottom:0;width:'+(w[i]/31*100)+'%;background:'+ZC[i]+';border-radius:3px"></i></span><span style="width:46px;text-align:right;color:'+(i==4?'#eef3f7':'#6c7d90')+'">'+t[i]+'</span></div>';document.getElementById('zl').innerHTML=h})();
 // profil coloré par pente
-(function(){var pts=[],h='';for(var i=0;i<=60;i++){var x=i*8,y=170-(i<20?i*1.2:i<45?24+(i-20)*4.2:129+(i-45)*1.8)+6*Math.sin(i/3);pts.push([x,y])}for(var i=0;i<60;i++){var g=(pts[i][1]-pts[i+1][1])/8*10,col=g<3?'#00e5c8':g<6?'#ffd23e':g<9?'#ff8a2e':'#e85022';h+='<path d="M'+pts[i][0]+' 190 L'+pts[i][0]+' '+pts[i][1].toFixed(1)+' L'+pts[i+1][0]+' '+pts[i+1][1].toFixed(1)+' L'+pts[i+1][0]+' 190Z" fill="'+col+'" opacity="'+(i<38?.85:.28)+'"/>'}h+='<circle cx="'+pts[38][0]+'" cy="'+pts[38][1]+'" r="9" fill="#fff" stroke="#06090d" stroke-width="4"/>';document.getElementById('prof').innerHTML=h})();
-// barres de tours
-(function(){var v=[214,232,246],h='',bw=60;var all=[208,214,232,246];for(var i=0;i<4;i++){var hh=(all[i]-150)/120*80,x=i*(bw+14);h+='<rect x="'+x+'" y="'+(90-hh)+'" width="'+bw+'" height="'+hh+'" rx="3" fill="'+(i==3?'#00e5c8':'#2a3a4c')+'"/><text x="'+(x+bw/2)+'" y="'+(84-hh)+'" fill="'+(i==3?'#eef3f7':'#6c7d90')+'" font-family="BC" font-weight="700" font-size="16" text-anchor="middle">'+all[i]+'</text>'}h+='<text x="448" y="88" fill="#6c7d90" font-family="BC" font-weight="600" font-size="14" text-anchor="end">T1 → T'+'4</text>';document.getElementById('laps').innerHTML=h})();
+(function(){var pts=[],h='';for(var i=0;i<=60;i++){var x=i*8,y=210-(i<20?i*1.2:i<45?24+(i-20)*4.2:129+(i-45)*1.8)+6*Math.sin(i/3);pts.push([x,y])}for(var i=0;i<60;i++){var g=(pts[i][1]-pts[i+1][1])/8*10,col=g<3?'#00e5c8':g<6?'#ffd23e':g<9?'#ff8a2e':'#e85022';h+='<path d="M'+pts[i][0]+' 230 L'+pts[i][0]+' '+pts[i][1].toFixed(1)+' L'+pts[i+1][0]+' '+pts[i+1][1].toFixed(1)+' L'+pts[i+1][0]+' 230Z" fill="'+col+'" opacity="'+(i<38?.85:.28)+'"/>'}h+='<circle cx="'+pts[38][0]+'" cy="'+pts[38][1]+'" r="9" fill="#fff" stroke="#06090d" stroke-width="4"/>';document.getElementById('prof').innerHTML=h})();
+// barres de tours : vitesse moyenne
+(function(){var all=[30.85,31.62,32.24,33.42],h='',bw=92;for(var i=0;i<4;i++){var hh=(all[i]-28)/6*170,x=i*(bw+26);h+='<rect x="'+x+'" y="'+(204-hh)+'" width="'+bw+'" height="'+hh+'" rx="3" fill="'+(i==3?'#00e5c8':'#2a3a4c')+'"/><text x="'+(x+bw/2)+'" y="'+(196-hh)+'" fill="'+(i==3?'#eef3f7':'#8a9bb0')+'" font-family="BC" font-weight="700" font-size="20" text-anchor="middle">'+all[i].toFixed(2)+'</text><text x="'+(x+bw/2)+'" y="'+(196)+'" fill="'+(i==3?'#06090d':'#6c7d90')+'" font-family="BC" font-weight="800" font-size="16" text-anchor="middle">T'+(i+1)+'</text>'}document.getElementById('laps').innerHTML=h})();
 </script>
 </body></html>
