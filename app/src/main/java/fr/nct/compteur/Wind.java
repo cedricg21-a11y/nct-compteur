@@ -22,13 +22,17 @@ public class Wind {
     private static final String TAG = "NCT-WIND";
     private final SharedPreferences prefs;
     private long[] times = new long[0];
-    private double[] spd = new double[0], dir = new double[0], gust = new double[0];
+    private double[] spd = new double[0], dir = new double[0], gust = new double[0], temp = new double[0];
     private long fetchedAt = 0, lastTry = 0;
     private volatile boolean busy;
 
     public Wind(Context c) {
         prefs = c.getSharedPreferences("wind", Context.MODE_PRIVATE);
-        try { parse(new JSONObject(prefs.getString("json", "{}"))); fetchedAt = prefs.getLong("at", 0); } catch (Exception ignored) {}
+        try {
+            String js = prefs.getString("json", "{}");
+            parse(new JSONObject(js));
+            fetchedAt = js.contains("temperature_2m") ? prefs.getLong("at", 0) : 0; // ancien cache sans température : on recharge
+        } catch (Exception ignored) {}
     }
 
     /** à appeler régulièrement : télécharge si la prévision a plus de 15 min (essai max toutes les 2 min). */
@@ -39,7 +43,7 @@ public class Wind {
         new Thread(() -> {
             try {
                 String u = String.format(Locale.US, "https://api.open-meteo.com/v1/forecast?latitude=%.3f&longitude=%.3f"
-                        + "&hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m&wind_speed_unit=kmh&timeformat=unixtime&forecast_days=2", lat, lon);
+                        + "&hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m,temperature_2m&wind_speed_unit=kmh&timeformat=unixtime&forecast_days=2", lat, lon);
                 HttpURLConnection c = (HttpURLConnection) new URL(u).openConnection();
                 c.setConnectTimeout(8000); c.setReadTimeout(8000);
                 StringBuilder sb = new StringBuilder();
@@ -61,10 +65,11 @@ public class Wind {
         JSONObject h = o.optJSONObject("hourly");
         if (h == null) return;
         JSONArray t = h.getJSONArray("time"), s = h.getJSONArray("wind_speed_10m"), d = h.getJSONArray("wind_direction_10m"), g = h.getJSONArray("wind_gusts_10m");
+        JSONArray tp = h.optJSONArray("temperature_2m");
         int n = t.length();
-        long[] tt = new long[n]; double[] ss = new double[n], dd = new double[n], gg = new double[n];
-        for (int i = 0; i < n; i++) { tt[i] = t.getLong(i) * 1000; ss[i] = s.optDouble(i, 0); dd[i] = d.optDouble(i, 0); gg[i] = g.optDouble(i, 0); }
-        times = tt; spd = ss; dir = dd; gust = gg;
+        long[] tt = new long[n]; double[] ss = new double[n], dd = new double[n], gg = new double[n], te = new double[n];
+        for (int i = 0; i < n; i++) { tt[i] = t.getLong(i) * 1000; ss[i] = s.optDouble(i, 0); dd[i] = d.optDouble(i, 0); gg[i] = g.optDouble(i, 0); te[i] = tp != null ? tp.optDouble(i, Double.NaN) : Double.NaN; }
+        times = tt; spd = ss; dir = dd; gust = gg; temp = te;
     }
 
     /** {direction d'où vient le vent (°), vitesse km/h, rafales km/h, âge de la prévision en min} ou null */
@@ -79,6 +84,7 @@ public class Wind {
         double x = (1 - k) * Math.cos(a) + k * Math.cos(b), y = (1 - k) * Math.sin(a) + k * Math.sin(b);
         double d = (Math.toDegrees(Math.atan2(y, x)) + 360) % 360;
         return new float[]{(float) d, (float) (spd[i] + (spd[i + 1] - spd[i]) * k), (float) (gust[i] + (gust[i + 1] - gust[i]) * k),
-                (System.currentTimeMillis() - fetchedAt) / 60000f};
+                (System.currentTimeMillis() - fetchedAt) / 60000f,
+                temp.length == n ? (float) (temp[i] + (temp[i + 1] - temp[i]) * k) : Float.NaN};
     }
 }

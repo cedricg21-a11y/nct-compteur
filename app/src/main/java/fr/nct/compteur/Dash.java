@@ -444,10 +444,11 @@ public class Dash extends View {
         if (e.getAction() == MotionEvent.ACTION_DOWN) {
             float x = e.getX() / sc, y = e.getY() / sc;
             sx0 = e.getX(); ignoreUp = false;
-            if (mapShown && mode == M_DASH && y > 52 && y < mapBottom()) {
-                if (x > 416 && y < 52 + 68) { host.mapZoom(1); ignoreUp = true; return true; }
-                if (x > 416 && y > 52 + 68 && y < 52 + 124) { host.mapZoom(-1); ignoreUp = true; return true; }
-                if (y > 52 + 124 && y < 52 + 180 && x > (mapExplore ? 296 : 416)) {
+            float mb = mapBottom();
+            if (mapShown && mode == M_DASH && y > HDR && y < mb) {
+                if (x > 414 && Math.abs(y - (mb - 150)) < 25) { host.mapZoom(1); ignoreUp = true; return true; }
+                if (x > 414 && Math.abs(y - (mb - 98)) < 25) { host.mapZoom(-1); ignoreUp = true; return true; }
+                if (Math.abs(y - (mb - 46)) < 25 && x > (mapExplore ? 296 : 414)) {
                     mapExplore = !mapExplore; host.mapExplore(mapExplore); ignoreUp = true; invalidate(); return true;
                 }
                 if (mapExplore) return false; // la carte reçoit le geste (déplacement, pincement)
@@ -469,13 +470,461 @@ public class Dash extends View {
             }
             if (mode != M_DASH) { menuTap(x, y); return true; }
             boolean paused = state.equals("pause") || state.equals("auto");
-            if (paused && Math.abs(dx) < 30 && y > H - 64 - 58 && y < H - 64 - 8) { button(x < 240 ? "startstop" : "lap"); return true; }
+            if (paused && Math.abs(dx) < 30 && y > H - BAND - 58 && y < H - BAND - 8) { button(x < 240 ? "startstop" : "lap"); return true; }
             if (Math.abs(dx) > 60) button(dx < 0 ? "next" : "prev");
             else if (y < 56) openMenu();              // appui sur l'en-tête : menu
-            else if (y > H - 64 && x < 140) button("startstop");
+            else if (y > H - BAND && x < 240) button("startstop");
             return true;
         }
         return super.onTouchEvent(e);
+    }
+
+    // ================================================================= style validé (nov. 2026)
+    static final float HDR = 46, BAND = 104;
+    static final int HAIR = 0xFF1C2836, BG2 = 0xFF06090D, DARKBAND = 0xFF0C131B;
+
+    float mapBottom() { return H - BAND - 90; }
+    float pivotY() { return HDR + (mapBottom() - HDR) * 0.62f; }
+
+    private void lab(Canvas c, String s, float x, float y, Paint.Align a) { text(c, s, x, y, bc6, 16, MUTE, a, .06f); }
+
+    private void hair(Canvas c, float x0, float y0, float x1, float y1) {
+        pf.setColor(HAIR);
+        if (y0 == y1) c.drawRect(x0, y0, x1, y0 + 1, pf); else c.drawRect(x0, y0, x0 + 1, y1, pf);
+    }
+
+    private void drawHeader(Canvas c) {
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        text(c, String.format(Locale.US, "%d:%02d", cal.get(java.util.Calendar.HOUR_OF_DAY), cal.get(java.util.Calendar.MINUTE)),
+                16, 33, bc7, 26, TXT, Paint.Align.LEFT, 0);
+        if (logoNct != null) {
+            float h = 22, w = logoNct.getWidth() * h / logoNct.getHeight();
+            rf.set(240 - w / 2, 12, 240 + w / 2, 12 + h); c.drawBitmap(logoNct, null, rf, pb);
+        }
+        // batterie
+        float bx = 464;
+        ps.setColor(TXT); ps.setStrokeWidth(2); rf.set(bx - 30, 16, bx - 2, 31); c.drawRoundRect(rf, 3, 3, ps);
+        pf.setColor(TXT); rf.set(bx - 2, 20, bx + 1, 27); c.drawRect(rf, pf);
+        if (s.bat >= 0) { rf.set(bx - 27, 19, bx - 27 + 22 * s.bat / 100f, 28); c.drawRect(rf, pf); }
+        String bt = s.bat >= 0 ? s.bat + "%" : "--";
+        pt.setTypeface(bc7); pt.setTextSize(22); pt.setLetterSpacing(0);
+        float tw = pt.measureText(bt);
+        text(c, bt, bx - 36, 32, bc7, 22, TXT, Paint.Align.RIGHT, 0);
+        // capteurs
+        float ix = bx - 40 - tw - 6;
+        boolean blink = (now() / 500) % 2 == 0;
+        int off = blink ? 0xFF3A4858 : 0x553A4858;
+        icon(c, icPin, ix - 22, 13, s.sGps ? CYAN : off);
+        icon(c, icHeart, ix - 48, 13, s.sHr ? 0xFFFF6B3D : off);
+        icon(c, icBolt, ix - 74, 13, s.sPwr ? CYAN : off);
+    }
+
+    /** bandeau bas : chrono + distance (ou arrivée quand un parcours sera chargé) */
+    private void drawFooter(Canvas c) {
+        float y = H - BAND;
+        pf.setColor(DARKBAND); c.drawRect(0, y, 480, H, pf);
+        pf.setColor(CYAN); c.drawRect(0, y, 480, y + 2, pf);
+        boolean paused = state.equals("pause") || state.equals("auto");
+        int dc = state.equals("rec") ? ORANGE : paused ? AMBER : 0xFF3A4858;
+        boolean on = !state.equals("rec") || (now() / 600) % 2 == 0;
+        pf.setColor(on ? dc : alpha(dc, 70)); c.drawCircle(23, y + 25, 5, pf);
+        String l = state.equals("rec") ? "CHRONO" : state.equals("auto") ? "PAUSE AUTO" : state.equals("pause") ? "PAUSE" : "PRÊT";
+        text(c, l, 34, y + 31, bc6, 16, paused ? AMBER : MUTE, Paint.Align.LEFT, .06f);
+        text(c, hms(s.elapsed), 18, y + 80, bc7, 54, TXT, Paint.Align.LEFT, -.01f);
+        lab(c, "DISTANCE", 462, y + 31, Paint.Align.RIGHT);
+        String d = String.format(Locale.US, "%.1f", m.dist / 1000);
+        pt.setTypeface(bc6); pt.setTextSize(26); pt.setLetterSpacing(0);
+        float kw = pt.measureText(" km");
+        text(c, " km", 462, y + 80, bc6, 26, CYAN, Paint.Align.RIGHT, 0);
+        text(c, d, 462 - kw, y + 80, bc7, 54, CYAN, Paint.Align.RIGHT, -.01f);
+    }
+
+    /** cellule de grille : libellé + valeur, alignement selon la colonne */
+    private void cell(Canvas c, int col, float t, String label, String val, int vcol, String unit) {
+        float x = col == 0 ? 16 : col == 1 ? 240 : 464;
+        Paint.Align a = col == 0 ? Paint.Align.LEFT : col == 1 ? Paint.Align.CENTER : Paint.Align.RIGHT;
+        text(c, label, x, t + 24, bc6, 17, MUTE, a, .05f);
+        if (unit == null || unit.isEmpty()) { text(c, val, x, t + 76, bc7, 56, vcol, a, -.01f); return; }
+        pt.setTypeface(bc7); pt.setTextSize(56); pt.setLetterSpacing(-.01f);
+        float vw = pt.measureText(val);
+        pt.setTypeface(bc6); pt.setTextSize(18); pt.setLetterSpacing(0);
+        float uw = pt.measureText(" " + unit), tot = vw + uw;
+        float x0 = a == Paint.Align.LEFT ? x : a == Paint.Align.CENTER ? x - tot / 2 : x - tot;
+        text(c, val, x0, t + 76, bc7, 56, vcol, Paint.Align.LEFT, -.01f);
+        text(c, " " + unit, x0 + vw, t + 76, bc6, 18, MUTE, Paint.Align.LEFT, 0);
+    }
+
+    private void gridLines(Canvas c, float t, int rows, float rh) {
+        hair(c, 0, t, 480, t);
+        for (int r = 0; r < rows; r++) {
+            float y = t + r * rh;
+            if (r > 0) hair(c, 0, y, 480, y);
+            hair(c, 160, y + 6, 160, y + rh - 6); hair(c, 320, y + 6, 320, y + rh - 6);
+        }
+    }
+
+    private String tempStr() { float[] w = host.wind(); return w != null && w.length > 4 && !Float.isNaN(w[4]) ? String.valueOf(Math.round(w[4])) : "--"; }
+
+    /** coût du vent en watts (positif = te freine), ou NaN */
+    private double windCost() {
+        float[] w = host.wind();
+        double v = s.spd / 3.6;
+        if (w == null || v < 1.5) return Double.NaN;
+        double head = w[1] / 3.6 * 0.7 * Math.cos(Math.toRadians(windRel(w[0]))); // vent à hauteur de cycliste ≈ 70 % du vent à 10 m
+        double cda = 0.32, rho = 1.2, va = v + head;
+        return 0.5 * rho * cda * v * (va * Math.abs(va) - v * v);
+    }
+
+    private void corner(Canvas c, boolean left, float yl, String label, String val, int col, String unit, float size) {
+        float x = left ? 14 : 466;
+        Paint.Align a = left ? Paint.Align.LEFT : Paint.Align.RIGHT;
+        text(c, label, x, yl, bc6, 15, MUTE, a, .06f);
+        pt.setTypeface(bc8); pt.setTextSize(size); pt.setLetterSpacing(0);
+        float vw = pt.measureText(val);
+        pt.setTypeface(bc8); pt.setTextSize(size * .43f);
+        float uw = unit == null ? 0 : pt.measureText(unit);
+        float x0 = left ? x : x - vw - uw;
+        text(c, val, x0, yl + size * .95f, bc8, size, col, Paint.Align.LEFT, 0);
+        if (unit != null) text(c, unit, x0 + vw, yl + size * .95f, bc8, size * .43f, left ? col : MUTE, Paint.Align.LEFT, 0);
+    }
+
+    // ---------------------------------------------------------------- LIVE : lunette boussole
+
+    private void pageLive(Canvas c, float top, float bottom) {
+        float gridT = bottom - 188 - 8, cx = 240, cy = top + (gridT - top) / 2 + 10;
+        float R = 190;
+        // lunette
+        ps.setStrokeCap(Paint.Cap.BUTT);
+        ps.setColor(0xFF111A24); ps.setStrokeWidth(18); c.drawCircle(cx, cy, R, ps);
+        float hd = shownBearing;
+        ps.setColor(0xFF2A3A4C); ps.setStrokeWidth(2);
+        for (int i = 0; i < 72; i++) {
+            double a = Math.toRadians(i * 5 - hd);
+            float l = i % 18 == 0 ? 14 : i % 6 == 0 ? 9 : 5;
+            float sx = (float) Math.sin(a), sy = (float) -Math.cos(a);
+            c.drawLine(cx + (R - l / 2) * sx, cy + (R - l / 2) * sy, cx + (R + l / 2) * sx, cy + (R + l / 2) * sy, ps);
+        }
+        String[] card = {"N", "E", "S", "O"};
+        for (int i = 0; i < 4; i++) {
+            double a = Math.toRadians(i * 90 - hd);
+            float x = cx + R * (float) Math.sin(a), y = cy - R * (float) Math.cos(a);
+            pf.setColor(BG2); c.drawCircle(x, y, 12, pf);
+            text(c, card[i], x, y + 6, bc8, 18, i == 0 ? ORANGE : 0xFF8A9BB0, Paint.Align.CENTER, 0);
+        }
+        // arc de puissance
+        float pr = 159;
+        rf.set(cx - pr, cy - pr, cx + pr, cy + pr);
+        ps.setStrokeCap(Paint.Cap.ROUND);
+        ps.setColor(0xFF141F2B); ps.setStrokeWidth(22); c.drawArc(rf, 139, 262, false, ps);
+        double tgt = Math.max(0, Math.min(1, v("pwr") / (m.ftp * 1.6)));
+        arcShown += (tgt - arcShown) * 0.25;
+        float sw = (float) (262 * arcShown);
+        if (sw > 0.5f) {
+            android.graphics.SweepGradient sg = new android.graphics.SweepGradient(cx, cy,
+                    new int[]{CYAN, CYAN, 0xFF9BE36A, AMBER, ORANGE, ORANGE}, new float[]{0, .01f, .55f * 262 / 360, .75f * 262 / 360, 262f / 360, 1});
+            android.graphics.Matrix mx = new android.graphics.Matrix(); mx.setRotate(139, cx, cy); sg.setLocalMatrix(mx);
+            ps.setShader(sg); c.drawArc(rf, 139, sw, false, ps); ps.setShader(null);
+        }
+        float[] hp = pt(cx, cy, 139 + sw, pr);
+        pf.setColor(BG2); c.drawCircle(hp[0], hp[1], 15, pf);
+        pf.setColor(0xFFFFFFFF); c.drawCircle(hp[0], hp[1], 11, pf);
+        // arcs FC (gauche) et W'bal (droite)
+        float ir = 138;
+        rf.set(cx - ir, cy - ir, cx + ir, cy + ir);
+        ps.setStrokeWidth(8);
+        ps.setColor(0xFF141F2B); c.drawArc(rf, 158.7f, 56.8f, false, ps); c.drawArc(rf, 21.3f, -56.8f, false, ps);
+        double hrR = s.hr > 0 ? Math.max(0.02, Math.min(1, (s.hr - .5 * m.hrMax) / (.5 * m.hrMax))) : 0;
+        if (hrR > 0) { ps.setColor(0xFFFF6B3D); c.drawArc(rf, 158.7f, (float) (56.8 * hrR), false, ps); }
+        double wb = Math.max(0.02, v("wbal") / 100);
+        ps.setColor(wcol(v("wbal"))); c.drawArc(rf, 21.3f, (float) (-56.8 * wb), false, ps);
+        ps.setStrokeCap(Paint.Cap.BUTT);
+        // point de vent sur la lunette (direction d'où il vient, relative à ta marche)
+        float[] w = host.wind();
+        if (w != null) {
+            double a = Math.toRadians(windRel(w[0]));
+            float x = cx + R * (float) Math.sin(a), y = cy - R * (float) Math.cos(a);
+            pf.setColor(ORANGE); c.drawCircle(x, y, 22, pf);
+            ps.setColor(0xFFFFFFFF); ps.setStrokeWidth(3); c.drawCircle(x, y, 22, ps);
+            text(c, String.valueOf(Math.round(w[1])), x, y + 8, bc8, 22, 0xFFFFFFFF, Paint.Align.CENTER, 0);
+        }
+        // centre
+        String pw = i0(v("pwr"));
+        pt.setTypeface(bc8); pt.setTextSize(64); pt.setLetterSpacing(0);
+        float pwW = pt.measureText(pw);
+        pt.setTypeface(bc8); pt.setTextSize(22);
+        float wW = pt.measureText(" W");
+        text(c, pw, cx - (pwW + wW) / 2, cy - 46, bc8, 64, AMBER, Paint.Align.LEFT, 0);
+        text(c, " W", cx - (pwW + wW) / 2 + pwW, cy - 46, bc8, 22, MUTE, Paint.Align.LEFT, 0);
+        text(c, f1(v("spd")), cx, cy + 52, bc8, 112, TXT, Paint.Align.CENTER, -.03f);
+        text(c, String.format(Locale.US, "%.2f", m.spdAvg()), cx, cy + 92, bc7, 30, CYAN, Paint.Align.CENTER, 0);
+        path.reset(); path.moveTo(cx, cy + 116); path.lineTo(cx + 11, cy + 142); path.lineTo(cx, cy + 136); path.lineTo(cx - 11, cy + 142); path.close();
+        pf.setColor(TXT); c.drawPath(path, pf);
+        // coins
+        corner(c, true, cy - 210, "TEMP.", tempStr(), TXT, "°C", 46);
+        double wc = windCost();
+        String wcs = Double.isNaN(wc) ? "--" : (wc >= 0 ? "+" : "−") + Math.round(Math.abs(wc));
+        corner(c, false, cy - 210, "VENT", wcs, Double.isNaN(wc) ? MUTE : wc >= 0 ? ORANGE : CYAN, " W", 46);
+        text(c, s.hr > 0 ? i0(v("hr")) : "--", 14, cy + 186, bc8, 40, 0xFFFF6B3D, Paint.Align.LEFT, 0);
+        text(c, "♥ BPM", 14, cy + 202, bc6, 13, MUTE, Paint.Align.LEFT, .08f);
+        text(c, i0(v("wbal")) + "%", 466, cy + 186, bc8, 40, wcol(v("wbal")), Paint.Align.RIGHT, 0);
+        text(c, "W'BAL", 466, cy + 202, bc6, 13, MUTE, Paint.Align.RIGHT, .08f);
+        // grille
+        float rh = 94;
+        gridLines(c, gridT, 2, rh);
+        cell(c, 0, gridT, "TOUR " + m.lap.n, ms(m.lap.t), TXT, null);
+        cell(c, 1, gridT, "CADENCE", s.sPwr || s.sCsc ? i0(v("cad")) : "--", TXT, null);
+        cell(c, 2, gridT, "NP", i0(v("np")), TXT, null);
+        cell(c, 0, gridT + rh, "D+", i0(v("dplus")), TXT, null);
+        cell(c, 1, gridT + rh, "PENTE %", f1(v("grade")), gcol(m.grade), null);
+        cell(c, 2, gridT + rh, "ALTITUDE", i0(v("alt")), TXT, null);
+    }
+
+    // ---------------------------------------------------------------- CARTE
+
+    private void pageMap(Canvas c, float top, float bottom) {
+        float mb = mapBottom();
+        boolean live = mapShown && cur == P_MAP;
+        if (!live) {
+            pf.setColor(0xFF0C1219); c.drawRect(0, top, 480, mb, pf);
+            if (!host.mapReady()) {
+                text(c, "AUCUNE CARTE TROUVÉE", 240, (top + mb) / 2 - 30, bc7, 26, TXT, Paint.Align.CENTER, .05f);
+                text(c, "Copie un fichier .map (Mapsforge)", 240, (top + mb) / 2 + 6, b6, 16, MUTE, Paint.Align.CENTER, 0);
+                text(c, "dans le dossier NCT/maps du compteur", 240, (top + mb) / 2 + 30, b6, 16, MUTE, Paint.Align.CENTER, 0);
+                text(c, host.mapInfo(), 240, (top + mb) / 2 + 66, b6, 13, DIM, Paint.Align.CENTER, 0);
+            }
+        } else {
+            pf.setShader(new LinearGradient(0, top, 0, top + 110, 0xEE06090D, 0x0006090D, Shader.TileMode.CLAMP));
+            c.drawRect(0, top, 480, top + 110, pf);
+            pf.setShader(new LinearGradient(0, mb - 60, 0, mb, 0x0006090D, 0xEE06090D, Shader.TileMode.CLAMP));
+            c.drawRect(0, mb - 60, 480, mb, pf); pf.setShader(null);
+            float px = 240, py = pivotY();
+            if (mapExplore) { float[] mp = host.mapPos(); if (mp != null) { px = mp[0] / sc; py = mp[1] / sc; } }
+            drawWindRing(c, px, py);
+            c.save(); c.translate(px, py); c.rotate(shownBearing - mapRot);
+            pf.setColor(0x5500E5C8); c.drawCircle(0, 0, 26, pf);
+            path.reset(); path.moveTo(0, -18); path.lineTo(13, 13); path.lineTo(0, 6); path.lineTo(-13, 13); path.close();
+            pf.setColor(0xFFFFFFFF); c.drawPath(path, pf);
+            ps.setColor(BG2); ps.setStrokeWidth(2.5f); ps.setStrokeJoin(Paint.Join.ROUND); c.drawPath(path, ps);
+            c.restore();
+            // coins : température / coût du vent
+            corner(c, true, top + 22, "TEMP.", tempStr(), TXT, "°C", 40);
+            double wc = windCost();
+            corner(c, false, top + 22, "VENT", Double.isNaN(wc) ? "--" : (wc >= 0 ? "+" : "−") + Math.round(Math.abs(wc)),
+                    Double.isNaN(wc) ? MUTE : wc >= 0 ? ORANGE : CYAN, " W", 40);
+            // boutons ronds : zoom + / − / exploration
+            roundBtn(c, 444, mb - 150, "+"); roundBtn(c, 444, mb - 98, "−");
+            if (mapExplore) {
+                pf.setColor(CYAN); rf.set(300, mb - 70, 466, mb - 24); c.drawRoundRect(rf, 23, 23, pf);
+                text(c, "◎ RECENTRER", 383, mb - 40, bc7, 18, BG, Paint.Align.CENTER, .06f);
+            } else {
+                roundBtn(c, 444, mb - 46, null);
+                ps.setColor(TXT); ps.setStrokeWidth(2.5f); c.drawCircle(441, mb - 49, 7, ps); c.drawLine(446, mb - 44, 452, mb - 38, ps);
+            }
+            // petite boussole
+            pf.setColor(0xCC06090D); c.drawCircle(36, mb - 46, 20, pf);
+            ps.setColor(0xFF2A3A4C); ps.setStrokeWidth(1); c.drawCircle(36, mb - 46, 20, ps);
+            c.save(); c.rotate(-mapRot, 36, mb - 46);
+            path.reset(); path.moveTo(36, mb - 63); path.lineTo(41, mb - 52); path.lineTo(31, mb - 52); path.close();
+            pf.setColor(ORANGE); c.drawPath(path, pf);
+            c.restore();
+            text(c, "N", 36, mb - 40, bc8, 12, TXT, Paint.Align.CENTER, 0);
+        }
+        // ligne de données
+        pf.setColor(BG2); c.drawRect(0, mb, 480, bottom, pf);
+        gridLines(c, mb, 1, 90);
+        cell(c, 0, mb, "PUISSANCE", i0(v("pwr")), AMBER, null);
+        cell(c, 1, mb, "VITESSE", f1(v("spd")), TXT, null);
+        cell(c, 2, mb, "FC", s.hr > 0 ? i0(v("hr")) : "--", 0xFFFF6B3D, null);
+    }
+
+    private void roundBtn(Canvas c, float x, float y, String l) {
+        pf.setColor(0xCC06090D); c.drawCircle(x, y, 22, pf);
+        ps.setColor(0xFF2A3A4C); ps.setStrokeWidth(1); c.drawCircle(x, y, 22, ps);
+        if (l != null) text(c, l, x, y + 10, bc8, 28, TXT, Paint.Align.CENTER, 0);
+    }
+
+    private void drawWindRing(Canvas c, float px, float py) {
+        float[] w = host.wind();
+        float R = 54;
+        ps.setColor(0x9906090D); ps.setStrokeWidth(8); c.drawCircle(px, py, R, ps);
+        ps.setColor(0x66FFFFFF); ps.setStrokeWidth(1.5f); c.drawCircle(px, py, R, ps);
+        if (w == null) return;
+        double a = Math.toRadians(w[0] - mapRot);
+        float x = px + R * (float) Math.sin(a), y = py - R * (float) Math.cos(a);
+        pf.setColor(ORANGE); c.drawCircle(x, y, 17, pf);
+        ps.setColor(0xFFFFFFFF); ps.setStrokeWidth(2.5f); c.drawCircle(x, y, 17, ps);
+        text(c, String.valueOf(Math.round(w[1])), x, y + 7, bc8, 18, 0xFFFFFFFF, Paint.Align.CENTER, 0);
+    }
+
+    // ---------------------------------------------------------------- EFFORT
+
+    private void pageEffort(Canvas c, float top, float bottom) {
+        float cx = 240, cy = top + 154, R = 118;
+        double pct = v("wbal");
+        int on = (int) Math.round(pct / 100 * 40), wc = wcol(pct);
+        ps.setStrokeWidth(26); ps.setStrokeCap(Paint.Cap.BUTT);
+        rf.set(cx - R, cy - R, cx + R, cy + R);
+        for (int i = 0; i < 40; i++) {
+            ps.setColor(i < on ? wc : 0xFF1A2532);
+            c.drawArc(rf, -90 + i * 9 + 1.2f, 6.6f, false, ps);
+        }
+        String p = i0(pct);
+        pt.setTypeface(bc8); pt.setTextSize(84); pt.setLetterSpacing(0);
+        float pw = pt.measureText(p);
+        pt.setTextSize(34); float uw = pt.measureText("%");
+        text(c, p, cx - (pw + uw) / 2, cy + 18, bc8, 84, wc, Paint.Align.LEFT, 0);
+        text(c, "%", cx - (pw + uw) / 2 + pw, cy + 18, bc8, 34, wc, Paint.Align.LEFT, 0);
+        text(c, "RÉSERVOIR W'BAL", cx, cy + 52, bc7, 16, MUTE, Paint.Align.CENTER, .12f);
+        text(c, f1(m.wbal / 1000) + " / " + i0(m.wPrime / 1000) + " kJ", cx, cy - 46, bc6, 16, MUTE, Paint.Align.CENTER, 0);
+        // coins
+        lab(c, "NP", 16, top + 34, Paint.Align.LEFT);           text(c, i0(v("np")), 16, top + 78, bc7, 48, TXT, Paint.Align.LEFT, 0);
+        lab(c, "IF", 464, top + 34, Paint.Align.RIGHT);         text(c, String.format(Locale.US, "%.2f", v("if")), 464, top + 78, bc7, 48, TXT, Paint.Align.RIGHT, 0);
+        lab(c, "TSS", 16, top + 250, Paint.Align.LEFT);         text(c, i0(v("tss")), 16, top + 292, bc7, 48, TXT, Paint.Align.LEFT, 0);
+        lab(c, "TRAVAIL", 464, top + 250, Paint.Align.RIGHT);
+        pt.setTypeface(bc6); pt.setTextSize(18); float kw = pt.measureText(" kJ");
+        text(c, " kJ", 464, top + 292, bc6, 18, MUTE, Paint.Align.RIGHT, 0);
+        text(c, i0(m.kj), 464 - kw, top + 292, bc7, 48, TXT, Paint.Align.RIGHT, 0);
+        // zones
+        float zt = top + 302, gridT = bottom - 90;
+        hair(c, 0, zt, 480, zt);
+        lab(c, "TEMPS DANS LES ZONES", 16, zt + 24, Paint.Align.LEFT);
+        long tot = 0, zmax = 1; for (long x : m.zoneSec) { tot += x; zmax = Math.max(zmax, x); }
+        text(c, hms(tot), 464, zt + 24, bc6, 16, TXT, Paint.Align.RIGHT, 0);
+        float bx = 16, bw = 448;
+        for (int i = 0; i < 7; i++) {
+            float w = tot > 0 ? bw * m.zoneSec[i] / tot : (i == 0 ? bw : 0);
+            pf.setColor(tot > 0 ? Metrics.ZCOL[i] : 0xFF1A2532); c.drawRect(bx, zt + 36, bx + w, zt + 52, pf); bx += w;
+        }
+        float rowH = Math.max(20, (gridT - (zt + 62)) / 7f);
+        int cz = Math.max(0, lastZone);
+        for (int i = 0; i < 7; i++) {
+            float y = zt + 62 + rowH * i + rowH / 2;
+            text(c, Metrics.ZN[i], 16, y + 6, bc7, 18, Metrics.ZCOL[i], Paint.Align.LEFT, 0);
+            pf.setColor(0xFF141D27); rf.set(52, y - 4, 404, y + 4); c.drawRoundRect(rf, 4, 4, pf);
+            float w = (float) (352.0 * m.zoneSec[i] / zmax);
+            if (w > 1) { pf.setColor(Metrics.ZCOL[i]); rf.set(52, y - 4, 52 + Math.max(8, w), y + 4); c.drawRoundRect(rf, 4, 4, pf); }
+            text(c, ms(m.zoneSec[i]), 464, y + 6, bc7, 18, i == cz && state.equals("rec") ? TXT : MUTE, Paint.Align.RIGHT, 0);
+        }
+        gridLines(c, gridT, 1, 90);
+        cell(c, 0, gridT, "MOY", i0(m.avgPower()), TXT, "W");
+        cell(c, 1, gridT, "MAX", i0(m.maxPower), TXT, "W");
+        cell(c, 2, gridT, "KCAL", i0(m.kj * 1.0), TXT, null);
+    }
+
+    // ---------------------------------------------------------------- GRIMPÉE
+
+    private void pageClimb(Canvas c, float top, float bottom) {
+        float gridT = bottom - 188, climbT = gridT - 56;
+        lab(c, "PENTE", 16, top + 22, Paint.Align.LEFT);
+        String g = f1(v("grade"));
+        int gc = gcol(m.grade);
+        pt.setTypeface(bc7); pt.setTextSize(104); pt.setLetterSpacing(-.01f);
+        float gw = pt.measureText(g);
+        text(c, g, 16, top + 112, bc7, 104, gc, Paint.Align.LEFT, -.01f);
+        text(c, "%", 16 + gw, top + 112, bc7, 40, gc, Paint.Align.LEFT, 0);
+        lab(c, "VAM", 464, top + 22, Paint.Align.RIGHT);       text(c, i0(v("vam")), 464, top + 68, bc7, 52, TXT, Paint.Align.RIGHT, 0);
+        lab(c, "ALTITUDE", 464, top + 96, Paint.Align.RIGHT);
+        pt.setTypeface(bc6); pt.setTextSize(18); float mw = pt.measureText(" m");
+        text(c, " m", 464, top + 142, bc6, 18, MUTE, Paint.Align.RIGHT, 0);
+        text(c, i0(v("alt")), 464 - mw, top + 142, bc7, 52, TXT, Paint.Align.RIGHT, 0);
+        drawProfile(c, 0, top + 150, 480, climbT);
+        // montée en cours
+        hair(c, 0, climbT, 480, climbT);
+        if (m.inClimb) {
+            lab(c, "MONTÉE EN COURS", 16, climbT + 24, Paint.Align.LEFT);
+            text(c, String.format(Locale.US, "%.1f km  ·  +%d m  ·  %.1f %% moy", m.climbDist() / 1000, Math.round(m.climbGain()), m.climbAvgGrade()),
+                    464, climbT + 24, bc7, 16, TXT, Paint.Align.RIGHT, 0);
+            float f = (float) Math.min(1, m.climbDist() / 3000);
+            pf.setColor(0xFF1A2532); rf.set(16, climbT + 36, 464, climbT + 46); c.drawRoundRect(rf, 5, 5, pf);
+            pf.setShader(new LinearGradient(16, 0, 464, 0, new int[]{0xFF9BE36A, 0xFFFFD23E, 0xFFFF8A2E}, null, Shader.TileMode.CLAMP));
+            rf.set(16, climbT + 36, 16 + 448 * f, climbT + 46); c.drawRoundRect(rf, 5, 5, pf); pf.setShader(null);
+        } else lab(c, "PAS DE MONTÉE EN COURS", 16, climbT + 32, Paint.Align.LEFT);
+        float rh = 94;
+        gridLines(c, gridT, 2, rh);
+        cell(c, 0, gridT, "D+", i0(v("dplus")), TXT, null);
+        cell(c, 1, gridT, "PUISS. 30S", i0(v("p30")), AMBER, null);
+        cell(c, 2, gridT, "W/KG", f1(v("p30") / m.weight), TXT, null);
+        cell(c, 0, gridT + rh, "VITESSE", f1(v("spd")), TXT, null);
+        cell(c, 1, gridT + rh, "CADENCE", s.sPwr || s.sCsc ? i0(v("cad")) : "--", TXT, null);
+        cell(c, 2, gridT + rh, "FC", s.hr > 0 ? i0(v("hr")) : "--", 0xFFFF6B3D, null);
+    }
+
+    /** profil des 5 derniers km, coloré selon la pente */
+    private void drawProfile(Canvas c, float l, float t, float r, float b) {
+        int n = m.prof.size();
+        if (n < 2) {
+            text(c, "Le profil se dessine pendant la sortie", (l + r) / 2, (t + b) / 2 + 30, b6, 15, DIM, Paint.Align.CENTER, 0);
+            return;
+        }
+        double d0 = m.prof.get(0).d, d1 = m.prof.get(n - 1).d, span = Math.max(1000, d1 - d0);
+        double mn = 1e9, mx = -1e9;
+        for (Metrics.Pt p : m.prof) { mn = Math.min(mn, p.a); mx = Math.max(mx, p.a); }
+        if (mx - mn < 40) { double mid = (mx + mn) / 2; mn = mid - 20; mx = mid + 20; }
+        float W = r - l, Hh = b - t - 16;
+        float[] xs = new float[n], ys = new float[n];
+        for (int i = 0; i < n; i++) {
+            Metrics.Pt p = m.prof.get(i);
+            xs[i] = (float) (r - 14 - (d1 - p.d) / span * (W - 14));
+            ys[i] = (float) (b - (p.a - mn) / (mx - mn) * Hh);
+        }
+        for (int i = 0; i < n - 1; i++) {
+            int j0 = Math.max(0, i - 3), j1 = Math.min(n - 1, i + 4);
+            double dd = m.prof.get(j1).d - m.prof.get(j0).d;
+            double gr = dd > 0 ? 100 * (m.prof.get(j1).a - m.prof.get(j0).a) / dd : 0;
+            path.reset(); path.moveTo(xs[i], b); path.lineTo(xs[i], ys[i]); path.lineTo(xs[i + 1], ys[i + 1]); path.lineTo(xs[i + 1], b); path.close();
+            pf.setColor(alpha(gcol(gr), 220)); c.drawPath(path, pf);
+        }
+        pf.setColor(0xFFFFFFFF); c.drawCircle(xs[n - 1], ys[n - 1], 9, pf);
+        ps.setColor(BG2); ps.setStrokeWidth(4); c.drawCircle(xs[n - 1], ys[n - 1], 9, ps);
+    }
+
+    // ---------------------------------------------------------------- TOUR : vitesse moyenne
+
+    private void pageLap(Canvas c, float top, float bottom) {
+        Metrics.Lap L = m.lap, P = m.prevLap;
+        text(c, "VITESSE MOYENNE · TOUR", 16, top + 24, bc6, 16, MUTE, Paint.Align.LEFT, .06f);
+        pt.setTypeface(bc6); pt.setTextSize(16); pt.setLetterSpacing(.06f);
+        text(c, String.valueOf(L.n), 16 + pt.measureText("VITESSE MOYENNE · TOUR "), top + 24, bc6, 16, CYAN, Paint.Align.LEFT, .06f);
+        String sp = String.format(Locale.US, "%.2f", L.spd());
+        pt.setTypeface(bc7); pt.setTextSize(140); pt.setLetterSpacing(-.01f);
+        float sw = pt.measureText(sp);
+        text(c, sp, 14, top + 152, bc7, 140, TXT, Paint.Align.LEFT, -.01f);
+        text(c, " km/h", 14 + sw, top + 152, bc6, 24, MUTE, Paint.Align.LEFT, 0);
+        if (P != null && P.spd() > 0) {
+            double d = L.spd() - P.spd();
+            text(c, (d >= 0 ? "▲ +" : "▼ ") + String.format(Locale.US, "%.2f", d) + " km/h", 16, top + 192, bc8, 26, d >= 0 ? CYAN : ORANGE, Paint.Align.LEFT, 0);
+            text(c, "TOUR " + P.n + " · " + String.format(Locale.US, "%.2f", P.spd()), 464, top + 192, bc6, 16, MUTE, Paint.Align.RIGHT, .04f);
+        } else text(c, "Appuie sur TOUR pour démarrer un nouveau tour", 16, top + 190, b6, 15, DIM, Paint.Align.LEFT, 0);
+        // graphique : vitesse moyenne par tour
+        float gridT = bottom - 188, ct = top + 210;
+        hair(c, 0, ct, 480, ct);
+        lab(c, "VITESSE MOYENNE PAR TOUR", 16, ct + 24, Paint.Align.LEFT);
+        java.util.List<Metrics.Lap> all = new java.util.ArrayList<>(m.laps);
+        all.add(L);
+        int k = Math.min(6, all.size());
+        java.util.List<Metrics.Lap> show = all.subList(all.size() - k, all.size());
+        double mn = 1e9, mx = 0;
+        for (Metrics.Lap x : show) { mn = Math.min(mn, x.spd()); mx = Math.max(mx, x.spd()); }
+        double lo = Math.max(0, mn - 3), hi = Math.max(lo + 4, mx + 1);
+        float base = gridT - 12, maxH = base - (ct + 60);
+        float bw = Math.min(92, (448 - (k - 1) * 20) / (float) k);
+        for (int i = 0; i < k; i++) {
+            Metrics.Lap x = show.get(i);
+            boolean curL = i == k - 1;
+            float hh = (float) Math.max(18, (x.spd() - lo) / (hi - lo) * maxH);
+            float bx = 16 + i * (bw + 20);
+            pf.setColor(curL ? CYAN : 0xFF2A3A4C); rf.set(bx, base - hh, bx + bw, base); c.drawRoundRect(rf, 3, 3, pf);
+            text(c, String.format(Locale.US, "%.2f", x.spd()), bx + bw / 2, base - hh - 8, bc7, 20, curL ? TXT : 0xFF8A9BB0, Paint.Align.CENTER, 0);
+            text(c, "T" + x.n, bx + bw / 2, base - 8, bc8, 16, curL ? BG : MUTE, Paint.Align.CENTER, 0);
+        }
+        float rh = 94;
+        gridLines(c, gridT, 2, rh);
+        cell(c, 0, gridT, "TEMPS TOUR", ms(L.t), TXT, null);
+        cell(c, 1, gridT, "DISTANCE", String.format(Locale.US, "%.2f", L.dist / 1000), TXT, null);
+        cell(c, 2, gridT, "PUISS. MOY", i0(L.ap()), TXT, null);
+        cell(c, 0, gridT + rh, "FC MOY", L.hr() > 0 ? i0(L.hr()) : "--", TXT, null);
+        cell(c, 1, gridT + rh, "CADENCE", L.cad() > 0 ? i0(L.cad()) : "--", TXT, null);
+        cell(c, 2, gridT + rh, "VIT. GLOBALE", String.format(Locale.US, "%.2f", m.spdAvg()), TXT, null);
     }
 
     // ================================================================= dessin
@@ -487,7 +936,7 @@ public class Dash extends View {
         c.save();
         c.scale(sc, sc);
 
-        float top = 52, bottom = H - 64;
+        float top = HDR, bottom = H - BAND;
         double k0 = Math.min(1, (n - pageT) / 380.0);
         boolean showMap = cur == P_MAP && k0 >= 1 && mode == M_DASH && !summary && learnStep < 0
                 && n >= confirmUntil && n - born > 3200 && host.mapReady();
@@ -498,8 +947,7 @@ public class Dash extends View {
         }
         c.save();
         if (mapShown) c.clipRect(0, top, 480, mapBottom(), android.graphics.Region.Op.DIFFERENCE);
-        c.drawColor(BG);
-        drawGlow(c, n);
+        c.drawColor(BG2);
         c.restore();
         drawHeader(c);
         // carte orientée dans le sens de la marche
@@ -534,136 +982,17 @@ public class Dash extends View {
     private float shownBearing = 0, mapRot = 0;
     public boolean headingUp = true;
     /** position du cycliste à l'écran : aux 2/3 bas de la carte pour voir la route devant */
-    float pivotY() { return 52 + (mapBottom() - 52) * 0.66f; }
-    float mapBottom() { return H - 64 - 116; }
 
     // ---------------------------------------------------------------- page carte
 
-    private void pageMap(Canvas c, float top, float bottom) {
-        float mb = mapBottom();
-        boolean live = mapShown && cur == P_MAP;
-        if (!live) {
-            pf.setColor(0xFF0B1118); c.drawRect(0, top, 480, mb, pf);
-            if (!host.mapReady()) {
-                text(c, "AUCUNE CARTE TROUVÉE", 240, (top + mb) / 2 - 30, bc7, 26, TXT, Paint.Align.CENTER, .05f);
-                text(c, "Copie un fichier .map (Mapsforge)", 240, (top + mb) / 2 + 6, b6, 16, MUTE, Paint.Align.CENTER, 0);
-                text(c, "dans le dossier NCT/maps du compteur", 240, (top + mb) / 2 + 30, b6, 16, MUTE, Paint.Align.CENTER, 0);
-                text(c, host.mapInfo(), 240, (top + mb) / 2 + 66, b6, 13, DIM, Paint.Align.CENTER, 0);
-            } else text(c, "CARTE", 240, (top + mb) / 2, bc7, 24, DIM, Paint.Align.CENTER, .2f);
-        } else {
-            // dégradés de lisibilité en haut et en bas de carte
-            pf.setShader(new LinearGradient(0, top, 0, top + 40, 0x99090E14, 0x00090E14, Shader.TileMode.CLAMP));
-            c.drawRect(0, top, 480, top + 40, pf);
-            pf.setShader(new LinearGradient(0, mb - 50, 0, mb, 0x00090E14, 0xCC090E14, Shader.TileMode.CLAMP));
-            c.drawRect(0, mb - 50, 480, mb, pf); pf.setShader(null);
-            // position : flèche orientée selon le cap (carte nord en haut), au centre de la vue carte
-            float px = 240, py = pivotY();
-            if (mapExplore) { float[] mp = host.mapPos(); if (mp != null) { px = mp[0] / sc; py = mp[1] / sc; } }
-            drawWindRing(c, px, py);
-            c.save(); c.translate(px, py); c.rotate(shownBearing - mapRot);
-            pf.setColor(0x5500E5C8); c.drawCircle(0, 0, 24, pf);
-            path.reset(); path.moveTo(0, -17); path.lineTo(12, 13); path.lineTo(0, 6); path.lineTo(-12, 13); path.close();
-            pf.setColor(0xFFFFFFFF); c.drawPath(path, pf);
-            ps.setColor(BG); ps.setStrokeWidth(2.5f); ps.setStrokeJoin(Paint.Join.ROUND); c.drawPath(path, ps);
-            c.restore();
-            // boutons zoom
-            zoomBtn(c, 420, top + 16, "+"); zoomBtn(c, 420, top + 72, "−");
-            // mode exploration
-            if (mapExplore) {
-                pf.setColor(CYAN); rf.set(300, top + 128, 468, top + 176); c.drawRoundRect(rf, 12, 12, pf);
-                text(c, "◎ RECENTRER", 384, top + 159, bc7, 18, BG, Paint.Align.CENTER, .06f);
-                text(c, "EXPLORATION — glisse pour te déplacer", 240, mb - 14, b7, 13, CYAN, Paint.Align.CENTER, .04f);
-            } else {
-                pf.setColor(0xE60E151E); rf.set(420, top + 128, 468, top + 176); c.drawRoundRect(rf, 12, 12, pf);
-                ps.setColor(LINE); ps.setStrokeWidth(1); c.drawRoundRect(rf, 12, 12, ps);
-                // icône main / exploration
-                ps.setColor(TXT); ps.setStrokeWidth(2.5f); c.drawCircle(441, top + 149, 9, ps); c.drawLine(448, top + 156, 456, top + 164, ps);
-            }
-            drawWind(c, top, px, py);
-        }
-        // bandeau de données
-        float t = mb + 6, w = (456 - 20) / 3f;
-        String[] lab = {"PUISSANCE 3S", "VITESSE", "DISTANCE"};
-        String[] val = {i0(v("pwr")), f1(v("spd")), String.format(Locale.US, "%.1f", v("dist"))};
-        String[] un = {"W", "KM/H", "KM"};
-        for (int i = 0; i < 3; i++) {
-            float l = 12 + i * (w + 10);
-            tile(c, l, t, l + w, bottom - 10, lab[i], null);
-            valUnit(c, l + 14, bottom - 26, val[i], 54, un[i]);
-        }
-        if (s.sPwr) { pf.setColor(zoneCol); rf.set(26, bottom - 18, 12 + w - 14, bottom - 14); c.drawRoundRect(rf, 2, 2, pf); }
-    }
 
     /** angle relatif du vent (d'où il vient) par rapport à la direction de marche, -180..180 */
     private float windRel(float from) { float r = (from - s.bearing) % 360; if (r > 180) r -= 360; if (r < -180) r += 360; return r; }
 
-    private void drawWindRing(Canvas c, float px, float py) {
-        float[] w = host.wind();
-        if (w == null) return;
-        float R = 46;
-        ps.setColor(0x99090E14); ps.setStrokeWidth(7); c.drawCircle(px, py, R, ps);
-        ps.setColor(0x55FFFFFF); ps.setStrokeWidth(1.5f); c.drawCircle(px, py, R, ps);
-        // le point est placé à la direction d'où vient le vent, dans le repère de la carte (tournée ou non)
-        double a = Math.toRadians(w[0] - mapRot);
-        float dx = (float) Math.sin(a), dy = (float) -Math.cos(a);
-        float x = px + R * dx, y = py + R * dy;
-        // petite flèche vers le cycliste (sens du vent)
-        path.reset();
-        float ix = px + (R - 20) * dx, iy = py + (R - 20) * dy, nx = -dy, ny = dx;
-        path.moveTo(ix, iy); path.lineTo(x - 10 * dx + 6 * nx, y - 10 * dy + 6 * ny); path.lineTo(x - 10 * dx - 6 * nx, y - 10 * dy - 6 * ny); path.close();
-        pf.setColor(0xCCE85022); c.drawPath(path, pf);
-        pf.setColor(0x66E85022); c.drawCircle(x, y, 19, pf);
-        pf.setColor(ORANGE); c.drawCircle(x, y, 15, pf);
-        ps.setColor(0xFFFFFFFF); ps.setStrokeWidth(2.5f); c.drawCircle(x, y, 15, ps);
-        text(c, String.valueOf(Math.round(w[1])), x, y + 6, bc8, 17, 0xFFFFFFFF, Paint.Align.CENTER, 0);
-    }
 
     private static final String[] DIR16 = {"N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSO", "SO", "OSO", "O", "ONO", "NO", "NNO"};
 
-    private void drawWind(Canvas c, float top, float px, float py) {
-        float[] w = host.wind();
-        float l = 12, t = top + 12, r = 196, b = t + 74;
-        pf.setColor(0xEB090E14); rf.set(l, t, r, b); c.drawRoundRect(rf, 14, 14, pf);
-        ps.setColor(LINE); ps.setStrokeWidth(1); c.drawRoundRect(rf, 14, 14, ps);
-        // mini-boussole nord
-        float cx = l + 32, cy = t + 37;
-        ps.setColor(0xFF2A3644); ps.setStrokeWidth(2); c.drawCircle(cx, cy, 20, ps);
-        c.save(); c.rotate(-mapRot, cx, cy);
-        path.reset(); path.moveTo(cx, cy - 19); path.lineTo(cx + 5, cy - 9); path.lineTo(cx - 5, cy - 9); path.close();
-        pf.setColor(MUTE); c.drawPath(path, pf);
-        c.restore();
-        if (w == null) {
-            text(c, "VENT", l + 64, t + 32, b7, 12, MUTE, Paint.Align.LEFT, .14f);
-            text(c, "pas de prévision", l + 64, t + 54, b6, 13, DIM, Paint.Align.LEFT, 0);
-            return;
-        }
-        // flèche du vent dans la boussole (sens du vent, vers où il souffle), dans le repère de la carte
-        double a = Math.toRadians(w[0] - mapRot);
-        float dx = (float) Math.sin(a), dy = (float) -Math.cos(a);
-        ps.setColor(ORANGE); ps.setStrokeWidth(4); ps.setStrokeCap(Paint.Cap.ROUND);
-        c.drawLine(cx + 16 * dx, cy + 16 * dy, cx - 8 * dx, cy - 8 * dy, ps);
-        ps.setStrokeCap(Paint.Cap.BUTT);
-        path.reset(); float nx = -dy, ny = dx, tx = cx - 15 * dx, ty = cy - 15 * dy;
-        path.moveTo(tx, ty); path.lineTo(cx - 6 * dx + 6 * nx, cy - 6 * dy + 6 * ny); path.lineTo(cx - 6 * dx - 6 * nx, cy - 6 * dy - 6 * ny); path.close();
-        pf.setColor(ORANGE); c.drawPath(path, pf);
-        // force du vent
-        String v = String.valueOf(Math.round(w[1]));
-        text(c, v, l + 64, t + 46, bc8, 36, TXT, Paint.Align.LEFT, 0);
-        pt.setTypeface(bc8); pt.setTextSize(36); pt.setLetterSpacing(0);
-        float vw = pt.measureText(v);
-        text(c, "km/h", l + 68 + vw, t + 30, bc6, 13, MUTE, Paint.Align.LEFT, 0);
-        text(c, DIR16[(int) Math.round(w[0] / 22.5) % 16], l + 68 + vw, t + 46, bc7, 14, TXT, Paint.Align.LEFT, 0);
-        float rel = Math.abs(windRel(w[0]));
-        String lab = rel <= 45 ? "DE FACE" : rel <= 135 ? "DE CÔTÉ" : "DANS LE DOS";
-        int col = rel <= 45 ? ORANGE : rel <= 135 ? AMBER : CYAN;
-        text(c, lab + "  ·  raf. " + Math.round(w[2]), l + 64, t + 64, b7, 11, col, Paint.Align.LEFT, .08f);
-    }
 
-    private void zoomBtn(Canvas c, float x, float y, String l) {
-        pf.setColor(0xE60E151E); rf.set(x, y, x + 48, y + 48); c.drawRoundRect(rf, 12, 12, pf);
-        ps.setColor(LINE); ps.setStrokeWidth(1); c.drawRoundRect(rf, 12, 12, ps);
-        text(c, l, x + 24, y + 35, bc8, 32, TXT, Paint.Align.CENTER, 0);
-    }
 
     private void drawGlow(Canvas c, long n) {
         float a = n - zoneFlashT < 700 ? .28f : .10f;
@@ -675,36 +1004,6 @@ public class Dash extends View {
 
     // ---------------------------------------------------------------- en-tête / pied
 
-    private void drawHeader(Canvas c) {
-        if (logoNct != null) {
-            float h = 26, w = logoNct.getWidth() * h / logoNct.getHeight();
-            rf.set(16, 13, 16 + w, 13 + h); c.drawBitmap(logoNct, null, rf, pb);
-            brand(c, 16, 45, 16 + 72, 48);
-        }
-        text(c, PAGES[cur], 240, 31, bc7, 20, TXT, Paint.Align.CENTER, .2f);
-        // points
-        float x = 240 - (6 * (PAGES.length - 1) + 18 + 6 * (PAGES.length - 1)) / 2f;
-        for (int i = 0; i < PAGES.length; i++) {
-            float w = i == cur ? 18 : 6;
-            pf.setColor(i == cur ? CYAN : 0xFF2A3746);
-            rf.set(x, 38, x + w, 44); c.drawRoundRect(rf, 3, 3, pf);
-            x += w + 6;
-        }
-        // statut
-        float bx = 464;
-        String bt = s.bat >= 0 ? s.bat + "%" : "--";
-        pt.setTypeface(bc6); pt.setTextSize(17);
-        float tw = pt.measureText(bt);
-        text(c, bt, bx, 32, bc6, 17, MUTE, Paint.Align.RIGHT, 0);
-        bx -= tw + 4;
-        ps.setColor(MUTE); ps.setStrokeWidth(2); rf.set(bx - 8, 19, bx, 33); c.drawRoundRect(rf, 2, 2, ps);
-        bx -= 8 + 9;
-        boolean blink = (now() / 500) % 2 == 0;
-        icon(c, icPin, bx - 20, 16, s.sGps ? CYAN : (blink ? 0xFF2E3B4A : 0x802E3B4A));
-        icon(c, icHeart, bx - 47, 16, s.sHr ? ORANGE : (blink ? 0xFF2E3B4A : 0x802E3B4A));
-        icon(c, icBolt, bx - 74, 16, s.sPwr ? CYAN : (blink ? 0xFF2E3B4A : 0x802E3B4A));
-        pf.setColor(LINE); c.drawRect(0, 51, 480, 52, pf);
-    }
 
     private void icon(Canvas c, Path p, float x, float y, int col) {
         c.save(); c.translate(x, y); c.scale(20 / 24f, 20 / 24f);
@@ -717,25 +1016,6 @@ public class Dash extends View {
         pf.setShader(null);
     }
 
-    private void drawFooter(Canvas c) {
-        float y = H - 64;
-        pf.setColor(0xE6090E14); c.drawRect(0, y, 480, H, pf);
-        pf.setColor(LINE); c.drawRect(0, y, 480, y + 1, pf);
-        // pastille d'état
-        boolean paused = state.equals("pause") || state.equals("auto");
-        int col = state.equals("rec") ? ORANGE : paused ? AMBER : 0xFF2A3746;
-        ps.setColor(col); ps.setStrokeWidth(2);
-        rf.set(17, y + 16, 125, y + 48); c.drawRoundRect(rf, 16, 16, ps);
-        boolean on = !state.equals("rec") || (now() / 600) % 2 == 0;
-        pf.setColor(state.equals("idle") ? 0xFF3A4858 : on ? col : (col & 0x40FFFFFF));
-        c.drawCircle(35, y + 32, 6, pf);
-        String l = state.equals("rec") ? "REC" : state.equals("auto") ? "AUTO" : state.equals("pause") ? "PAUSE" : "PRÊT";
-        text(c, l, 49, y + 39, bc7, 18, state.equals("rec") ? TXT : paused ? AMBER : MUTE, Paint.Align.LEFT, .11f);
-        text(c, hms(s.elapsed), 240, y + 45, bc7, 38, TXT, Paint.Align.CENTER, .01f);
-        java.util.Calendar cal = java.util.Calendar.getInstance();
-        text(c, String.format(Locale.US, "%02d:%02d", cal.get(java.util.Calendar.HOUR_OF_DAY), cal.get(java.util.Calendar.MINUTE)),
-                464, y + 40, bc6, 22, MUTE, Paint.Align.RIGHT, 0);
-    }
 
     // ---------------------------------------------------------------- pages
 
@@ -749,233 +1029,17 @@ public class Dash extends View {
         }
     }
 
-    private void pageLive(Canvas c, float top, float bottom) {
-        float cx = 240, cy = top + 204, r = 150;
-        // graduations de zones
-        double scale = 1.6;
-        for (int i = 0; i < 6; i++) {
-            double deg = 135 + 270 * Math.min(Metrics.ZMAX[i] / scale, 1);
-            float[] a = pt(cx, cy, deg, r + 18), b = pt(cx, cy, deg, r + 30);
-            ps.setColor(0xFF2A3644); ps.setStrokeWidth(3); ps.setStrokeCap(Paint.Cap.BUTT);
-            c.drawLine(a[0], a[1], b[0], b[1], ps);
-        }
-        for (int i = 0; i < 7; i++) {
-            double lo = i == 0 ? 0 : Metrics.ZMAX[i - 1], hi = Math.min(Metrics.ZMAX[i], scale);
-            if (lo >= scale) break;
-            float[] l = pt(cx, cy, 135 + 270 * ((lo + hi) / 2 / scale), r + 38);
-            text(c, String.valueOf(i + 1), l[0], l[1] + 5, bc6, 14, 0xFF3E4E60, Paint.Align.CENTER, 0);
-        }
-        rf.set(cx - r, cy - r, cx + r, cy + r);
-        ps.setStrokeCap(Paint.Cap.ROUND);
-        ps.setColor(0xFF151F2B); ps.setStrokeWidth(24); c.drawArc(rf, 135, 270, false, ps);
-        double target = Math.max(0, Math.min(1, v("pwr") / (m.ftp * scale)));
-        arcShown += (target - arcShown) * 0.25;
-        float sweep = (float) (270 * arcShown);
-        if (sweep > 0.5f) {
-            ps.setShader(arcGrad);
-            ps.setAlpha(41); ps.setStrokeWidth(44); c.drawArc(rf, 135, sweep, false, ps);
-            ps.setAlpha(255); ps.setStrokeWidth(24); c.drawArc(rf, 135, sweep, false, ps);
-            ps.setShader(null);
-        }
-        float[] hp = pt(cx, cy, 135 + sweep, r);
-        pf.setColor(BG); c.drawCircle(hp[0], hp[1], 11, pf);
-        pf.setColor(0xFFFFFFFF); c.drawCircle(hp[0], hp[1], 8, pf);
-        ps.setStrokeCap(Paint.Cap.BUTT);
 
-        // centre
-        text(c, i0(v("pwr")), cx, top + 218, bc7, 148, TXT, Paint.Align.CENTER, -.02f);
-        pt.setTypeface(bc6); pt.setTextSize(18); pt.setLetterSpacing(.17f);
-        float w1 = pt.measureText("WATTS "), w2 = pt.measureText("3S");
-        text(c, "WATTS ", cx - (w1 + w2) / 2, top + 246, bc6, 18, MUTE, Paint.Align.LEFT, .17f);
-        text(c, "3S", cx - (w1 + w2) / 2 + w1, top + 246, bc6, 18, CYAN, Paint.Align.LEFT, .17f);
-        int z = Math.max(0, lastZone);
-        String zl = Metrics.ZN[z] + " · " + Metrics.ZNAME[z];
-        pt.setTypeface(bc7); pt.setTextSize(19); pt.setLetterSpacing(.1f);
-        float zw = pt.measureText(zl) + 28;
-        pf.setColor(zoneCol); rf.set(cx - zw / 2, top + 260, cx + zw / 2, top + 292); c.drawRoundRect(rf, 16, 16, pf);
-        text(c, zl, cx, top + 283, bc7, 19, BG, Paint.Align.CENTER, .1f);
-        // côtés
-        text(c, f1(v("wkg")), 56, top + 298, bc7, 40, TXT, Paint.Align.CENTER, 0);
-        text(c, "W/KG", 56, top + 316, bc6, 14, MUTE, Paint.Align.CENTER, .14f);
-        text(c, i0(v("pftp")), 424, top + 298, bc7, 40, TXT, Paint.Align.CENTER, 0);
-        text(c, "% FTP", 424, top + 316, bc6, 14, MUTE, Paint.Align.CENTER, .14f);
 
-        // tuiles 2x2
-        float t0 = top + 322, gap = 10, th = (bottom - 12 - t0 - gap) / 2;
-        float[] xs = {12, 246}; float tw = 222;
-        // FC
-        tile(c, xs[0], t0, xs[0] + tw, t0 + th, "FRÉQ. CARDIAQUE", icHeart);
-        valUnit(c, xs[0] + 14, t0 + 100, s.hr > 0 ? i0(v("hr")) : "--", 78, "BPM");
-        int hz = s.hr > 0 ? Math.min(4, Math.max(0, (int) Math.floor((s.hr / (double) m.hrMax - .5) / .1))) : -1;
-        float sw = (tw - 28 - 16) / 5;
-        for (int i = 0; i < 5; i++) {
-            pf.setColor(i <= hz ? ORANGE : LINE);
-            rf.set(xs[0] + 14 + i * (sw + 4), t0 + th - 22, xs[0] + 14 + i * (sw + 4) + sw, t0 + th - 14);
-            c.drawRoundRect(rf, 4, 4, pf);
-        }
-        // cadence
-        tile(c, xs[1], t0, xs[1] + tw, t0 + th, "CADENCE", null);
-        valUnit(c, xs[1] + 14, t0 + 100, s.sPwr || s.sCsc ? i0(v("cad")) : "--", 78, "RPM");
-        sub(c, xs[1] + 14, t0 + th - 16, "moy " + (m.cadAvg() > 0 ? i0(m.cadAvg()) : "--"));
-        // vitesse
-        float t1 = t0 + th + gap;
-        tile(c, xs[0], t1, xs[0] + tw, t1 + th, "VITESSE", null);
-        valUnit(c, xs[0] + 14, t1 + 100, f1(v("spd")), 78, "KM/H");
-        sub(c, xs[0] + 14, t1 + th - 16, "moy " + f1(m.spdAvg()));
-        // distance
-        tile(c, xs[1], t1, xs[1] + tw, t1 + th, "DISTANCE", null);
-        valUnit(c, xs[1] + 14, t1 + 100, String.format(Locale.US, "%.2f", v("dist")), 78, "KM");
-        sub(c, xs[1] + 14, t1 + th - 16, "D+ " + Math.round(m.dplus) + " m");
-    }
 
-    private void pageEffort(Canvas c, float top, float bottom) {
-        float t = top + 8, w = (456 - 20) / 3f;
-        String[] lab = {"NP", "IF", "TSS"}, val = {i0(v("np")), String.format(Locale.US, "%.2f", v("if")), i0(v("tss"))}, sb = {"WATTS", "INTENSITÉ", "CHARGE"};
-        for (int i = 0; i < 3; i++) {
-            float l = 12 + i * (w + 10), cx = l + w / 2;
-            tile(c, l, t, l + w, t + 148, null, null);
-            text(c, lab[i], cx, t + 30, b7, 13, MUTE, Paint.Align.CENTER, .12f);
-            text(c, val[i], cx, t + 92, bc7, 62, TXT, Paint.Align.CENTER, -.01f);
-            text(c, sb[i], cx, t + 130, bc6, 18, MUTE, Paint.Align.CENTER, .03f);
-        }
-        // réservoir W'bal
-        float wt = t + 158, wb = wt + 228;
-        tile(c, 12, wt, 468, wb, null, null);
-        pt.setTypeface(b7); pt.setTextSize(13); pt.setLetterSpacing(.12f);
-        text(c, "RÉSERVOIR", 26, wt + 30, b7, 13, MUTE, Paint.Align.LEFT, .12f);
-        text(c, "W'BAL", 26 + pt.measureText("RÉSERVOIR ") + 4, wt + 30, b7, 13, DIM, Paint.Align.LEFT, .12f);
-        pt.setTypeface(b7); pt.setTextSize(11); pt.setLetterSpacing(.14f);
-        float tgw = pt.measureText("EXCLU NCT") + 18;
-        pf.setColor(ORANGE); rf.set(454 - tgw, wt + 15, 454, wt + 35); c.drawRoundRect(rf, 10, 10, pf);
-        text(c, "EXCLU NCT", 454 - tgw / 2, wt + 29, b7, 11, BG, Paint.Align.CENTER, .14f);
-        double pct = v("wbal");
-        int wc = wcol(pct);
-        String ps_ = i0(pct);
-        text(c, ps_, 24, wt + 127, bc8, 104, wc, Paint.Align.LEFT, -.02f);
-        pt.setTypeface(bc8); pt.setTextSize(104); pt.setLetterSpacing(-.02f);
-        text(c, "%", 24 + pt.measureText(ps_) + 4, wt + 127, bc7, 36, MUTE, Paint.Align.LEFT, 0);
-        text(c, f1(m.wbal / 1000) + " / " + f1(m.wPrime / 1000) + " kJ", 454, wt + 127, bc6, 19, MUTE, Paint.Align.RIGHT, 0);
-        int on = (int) Math.round(pct / 100 * 24);
-        float segW = (428 - 23 * 3) / 24f;
-        for (int i = 0; i < 24; i++) {
-            pf.setColor(i < on ? wcol(100.0 * i / 24 + 4) : 0xFF17212C);
-            float x = 26 + i * (segW + 3);
-            rf.set(x, wt + 144, x + segW, wt + 170); c.drawRoundRect(rf, 3, 3, pf);
-        }
-        text(c, wmsg(pct), 26, wt + 200, b6, 15, MUTE, Paint.Align.LEFT, 0);
 
-        // zones
-        float zt = wb + 10, zb = bottom - 12;
-        tile(c, 12, zt, 468, zb, "TEMPS DANS LES ZONES", null);
-        long zmax = 1; for (long x : m.zoneSec) zmax = Math.max(zmax, x);
-        float rowH = (zb - zt - 50) / 7f;
-        int cz = Math.max(0, lastZone);
-        for (int i = 0; i < 7; i++) {
-            float y = zt + 50 + rowH * i + rowH / 2;
-            text(c, Metrics.ZN[i], 26, y + 6, bc7, 17, Metrics.ZCOL[i], Paint.Align.LEFT, 0);
-            pf.setColor(0xFF141D27); rf.set(58, y - 7, 380, y + 7); c.drawRoundRect(rf, 7, 7, pf);
-            float bw = (float) (322.0 * m.zoneSec[i] / zmax);
-            if (bw > 1) { pf.setColor(Metrics.ZCOL[i]); rf.set(58, y - 7, 58 + Math.max(14, bw), y + 7); c.drawRoundRect(rf, 7, 7, pf); }
-            text(c, ms(m.zoneSec[i]), 454, y + 6, bc6, 17, i == cz && state.equals("rec") ? TXT : MUTE, Paint.Align.RIGHT, 0);
-        }
-    }
-
-    private void pageClimb(Canvas c, float top, float bottom) {
-        float t = top + 8;
-        double g = v("grade");
-        pf.setColor(gcol(m.grade)); rf.set(12, t, 274, t + 206); c.drawRoundRect(rf, 16, 16, pf);
-        String gs = f1(g);
-        float fs = (g < 0 || g >= 10) ? 112 : 146;
-        pt.setTypeface(bc8); pt.setTextSize(fs); pt.setLetterSpacing(-.03f);
-        float gw = pt.measureText(gs);
-        pt.setTextSize(fs / 3.1f); float pw = pt.measureText("%");
-        float gx = 143 - (gw + pw) / 2;
-        text(c, gs, gx, t + 140, bc8, fs, BG, Paint.Align.LEFT, -.03f);
-        text(c, "%", gx + gw + 2, t + 140, bc8, fs / 3.1f, BG, Paint.Align.LEFT, 0);
-        text(c, "PENTE", 143, t + 188, b7, 14, 0xBF090E14, Paint.Align.CENTER, .28f);
-        // côté
-        small(c, 284, t, 468, t + 98, "VAM", i0(v("vam")), "m/h");
-        small(c, 284, t + 108, 468, t + 206, "ALTITUDE", i0(v("alt")), "m");
-        // profil
-        float pt0 = t + 216, pb0 = bottom - 12 - 132 - 10;
-        tile(c, 12, pt0, 468, pb0, "PROFIL", null);
-        pt.setTypeface(b7); pt.setTextSize(13); pt.setLetterSpacing(.12f);
-        text(c, "5 DERNIERS KM", 26 + pt.measureText("PROFIL ") + 4, pt0 + 30, b7, 13, DIM, Paint.Align.LEFT, .12f);
-        drawProfile(c, 26, pt0 + 46, 454, pb0 - 14);
-        // bas
-        float bt = bottom - 12 - 132;
-        tile(c, 12, bt, 234, bottom - 12, "D+ TOTAL", null);
-        valUnit(c, 26, bt + 92, i0(v("dplus")), 58, "M");
-        tile(c, 246, bt, 468, bottom - 12, "PUISSANCE 30S", null);
-        valUnit(c, 260, bt + 92, i0(v("p30")), 58, "W");
-    }
-
-    private void drawProfile(Canvas c, float l, float t, float r, float b) {
-        if (m.prof.size() < 2) {
-            text(c, "En attente de données d'altitude…", (l + r) / 2, (t + b) / 2, b6, 15, DIM, Paint.Align.CENTER, 0);
-            return;
-        }
-        double d0 = m.prof.get(0).d, d1 = m.prof.get(m.prof.size() - 1).d, span = Math.max(1000, d1 - d0);
-        double mn = 1e9, mx = -1e9;
-        for (Metrics.Pt p : m.prof) { mn = Math.min(mn, p.a); mx = Math.max(mx, p.a); }
-        if (mx - mn < 30) { double mid = (mx + mn) / 2; mn = mid - 15; mx = mid + 15; }
-        float W = r - l, Hh = b - t;
-        path.reset();
-        float lx = 0, ly = 0, fx = 0;
-        for (int i = 0; i < m.prof.size(); i++) {
-            Metrics.Pt p = m.prof.get(i);
-            float x = (float) (r - (d1 - p.d) / span * W), y = (float) (b - 8 - (p.a - mn) / (mx - mn) * (Hh - 16));
-            if (i == 0) { path.moveTo(x, y); fx = x; } else path.lineTo(x, y);
-            lx = x; ly = y;
-        }
-        Path fill = new Path(path); fill.lineTo(lx, b); fill.lineTo(fx, b); fill.close();
-        pf.setShader(new LinearGradient(0, t, 0, b, 0x8C00E5C8, 0x0000E5C8, Shader.TileMode.CLAMP));
-        c.drawPath(fill, pf); pf.setShader(null);
-        ps.setColor(CYAN); ps.setStrokeWidth(3); ps.setStrokeJoin(Paint.Join.ROUND); c.drawPath(path, ps);
-        pf.setColor(0xFFFFFFFF); c.drawCircle(lx - 4, ly, 7, pf);
-        ps.setColor(ORANGE); ps.setStrokeWidth(4); c.drawCircle(lx - 4, ly, 7, ps);
-    }
-
-    private void pageLap(Canvas c, float top, float bottom) {
-        float t = top + 8;
-        Metrics.Lap L = m.lap, P = m.prevLap;
-        pf.setShader(new LinearGradient(12, t, 468, t + 150, 0x2400E5C8, 0x1AE85022, Shader.TileMode.CLAMP));
-        rf.set(12, t, 468, t + 150); c.drawRoundRect(rf, 16, 16, pf); pf.setShader(null);
-        ps.setColor(LINE); ps.setStrokeWidth(1); c.drawRoundRect(rf, 16, 16, ps);
-        pt.setTypeface(bc7); pt.setTextSize(18); pt.setLetterSpacing(.22f);
-        String n = String.valueOf(L.n);
-        float w1 = pt.measureText("TOUR "), w2 = pt.measureText(n);
-        text(c, "TOUR ", 240 - (w1 + w2) / 2, t + 34, bc7, 18, MUTE, Paint.Align.LEFT, .22f);
-        text(c, n, 240 - (w1 + w2) / 2 + w1, t + 34, bc7, 18, CYAN, Paint.Align.LEFT, .22f);
-        text(c, ms(L.t), 240, t + 112, bc8, 84, TXT, Paint.Align.CENTER, 0);
-        text(c, String.format(Locale.US, "%.2f km", L.dist / 1000), 240, t + 138, bc6, 18, MUTE, Paint.Align.CENTER, 0);
-
-        float g0 = t + 160, rh = (bottom - 12 - g0 - 20) / 3;
-        String[] lab = {"PUISS. MOY", "NP TOUR", "FC MOY", "VITESSE MOY", "CADENCE MOY", "W/KG TOUR"};
-        String[] un = {"W", "W", "BPM", "KM/H", "RPM", ""};
-        String[] vv = {i0(v("lapP")), i0(v("lapNp")), L.hr() > 0 ? i0(v("lapHr")) : "--", f1(v("lapS")), L.cad() > 0 ? i0(v("lapC")) : "--", f1(v("lapW"))};
-        double[] a = {L.ap(), L.np(), L.hr(), L.spd(), L.cad(), L.ap() / m.weight};
-        double[] bb = P == null ? null : new double[]{P.ap(), P.np(), P.hr(), P.spd(), P.cad(), P.ap() / m.weight};
-        int[] dec = {0, 0, 0, 1, 0, 1};
-        String[] du = {" W", " W", "", "", "", ""};
-        for (int i = 0; i < 6; i++) {
-            float x = i % 2 == 0 ? 12 : 246, y = g0 + (i / 2) * (rh + 10);
-            tile(c, x, y, x + 222, y + rh, lab[i], null);
-            valUnit(c, x + 14, y + 88, vv[i], 58, un[i]);
-            if (bb != null && a[i] > 0 && bb[i] > 0) {
-                double d = a[i] - bb[i];
-                String ds = (d >= 0 ? "▲ +" : "▼ ") + String.format(Locale.US, "%." + dec[i] + "f", d) + du[i] + " vs tour préc.";
-                text(c, ds, x + 14, y + rh - 16, bc7, 16, d >= 0 ? CYAN : ORANGE, Paint.Align.LEFT, 0);
-            }
-        }
-    }
 
     // ---------------------------------------------------------------- overlays
 
     private void drawOverlays(Canvas c, long n) {
         // bandeau pause : rappel des actions
         if ((state.equals("pause") || state.equals("auto")) && mode == M_DASH && n >= confirmUntil && !summary && !pauseMenu) {
-            float y = H - 64 - 58;
+            float y = H - BAND - 58;
             pf.setColor(0xF2120E06); rf.set(12, y, 468, y + 50); c.drawRoundRect(rf, 14, 14, pf);
             ps.setColor(AMBER); ps.setStrokeWidth(2); c.drawRoundRect(rf, 14, 14, ps);
             text(c, state.equals("auto") ? "REPARS = REPRISE" : "START  reprendre", 128, y + 32, bc7, 20, AMBER, Paint.Align.CENTER, .06f);

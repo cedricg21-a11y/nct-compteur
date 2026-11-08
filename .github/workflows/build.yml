@@ -72,7 +72,7 @@ jobs:
             adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 1000 --ei page 1 ; sleep 12 ; adb exec-out screencap -p > shots/1b-carte.png
             adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 2600 --ei page 2 ; sleep 4 ; adb exec-out screencap -p > shots/2-effort.png
             adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 1500 --ei page 3 ; sleep 4 ; adb exec-out screencap -p > shots/3-grimpee.png
-            adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 2400 --ei lap 1500 --ei page 4 ; sleep 4 ; adb exec-out screencap -p > shots/4-tour.png
+            adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 2400 --ei lap 600 --ei page 4 ; sleep 4 ; adb exec-out screencap -p > shots/4-tour.png
             adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 300 --ei mode 1 ; sleep 3 ; adb exec-out screencap -p > shots/5-menu.png
             adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 300 --ei mode 2 ; sleep 3 ; adb exec-out screencap -p > shots/6-capteurs.png
             adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 300 --ei mode 3 ; sleep 3 ; adb exec-out screencap -p > shots/7-profil.png

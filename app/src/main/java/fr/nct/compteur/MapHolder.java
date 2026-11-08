@@ -71,7 +71,11 @@ public class MapHolder {
         TileCache cache = AndroidUtil.createTileCache(a, "nctmap",
                 view.getModel().displayModel.getTileSize(), 1f, view.getModel().frameBufferModel.getOverdrawFactor());
         TileRendererLayer layer = new TileRendererLayer(cache, store, view.getModel().mapViewPosition, AndroidGraphicFactory.INSTANCE);
-        layer.setXmlRenderTheme(theme());
+        XmlRenderTheme th = null;
+        try { th = new org.mapsforge.map.android.rendertheme.AssetsRenderTheme(a.getAssets(), "", "nct-dark.xml"); }
+        catch (Throwable t) { Log.e(TAG, "thème NCT", t); }
+        layer.setXmlRenderTheme(th != null ? th : theme());
+        try { view.getModel().displayModel.setBackgroundColor(0xFF0C1219); } catch (Throwable ignored) {}
         view.getLayerManager().getLayers().add(layer);
 
         Paint p = AndroidGraphicFactory.INSTANCE.createPaint();

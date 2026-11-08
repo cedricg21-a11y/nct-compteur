@@ -88,7 +88,7 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
             Ride.Sample smp = sim.step();
             dash.onSample(smp);
             if (map != null && i > ff - 600) map.update(smp);
-            if (sim.time() == lapAt) dash.newLapQuiet();
+            if (lapAt > 0 && sim.time() % lapAt == 0) dash.newLapQuiet();
         }
         dash.quiet = getIntent().getStringExtra("toast") == null;
         dash.goDash();
@@ -272,7 +272,7 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
     }
 
     @Override public float[] wind() {
-        if (sim != null) return new float[]{315, 22, 31, 8};
+        if (sim != null) return new float[]{315, 22, 31, 8, 11};
         return wind == null ? null : wind.now();
     }
 

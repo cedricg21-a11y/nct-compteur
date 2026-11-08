@@ -37,6 +37,10 @@ public class Metrics {
     final ArrayList<double[]> altHist = new ArrayList<>(); // {t, d, a}
     public final ArrayList<Pt> prof = new ArrayList<>();
     public Lap lap = new Lap(), prevLap;
+    public final ArrayList<Lap> laps = new ArrayList<>();
+    public double maxPower, pTot; public long pCnt;
+    // montée en cours
+    public boolean inClimb; double climbD0, climbA0, climbEndRun; double climbLastA, climbGainAcc;
 
     public Metrics() { reset(); }
 
@@ -44,7 +48,8 @@ public class Metrics {
         t = moving = 0; pwrN = pwrI = 0; r30N = r30I = 0; p4Sum = 0; p4N = 0;
         kj = 0; wbal = wPrime; dist = 0; dplus = 0; grade = 0; zoneSec = new long[7];
         cadSum = 0; cadN = 0; lastAlt = null; altHist.clear(); prof.clear();
-        lap = new Lap(); prevLap = null;
+        lap = new Lap(); prevLap = null; laps.clear();
+        maxPower = 0; pTot = 0; pCnt = 0; inClimb = false;
     }
 
     public int zoneOf(double p) {
@@ -67,6 +72,7 @@ public class Metrics {
         if (!rec) return;
         t++;
         if (spd > 2) moving++;
+        pTot += p; pCnt++; if (p > maxPower) maxPower = p;
         kj += p / 1000;
         zoneSec[zoneOf(p)]++;
         if (cad > 0) { cadSum += cad; cadN++; }
@@ -89,6 +95,14 @@ public class Metrics {
                 double dd = dist - altHist.get(i)[1];
                 if (dd >= 60) { grade = 100 * (alt - altHist.get(i)[2]) / dd; break; }
             }
+            // détection de montée : > 3 % ; fin quand la pente reste < 1 % sur 200 m
+            if (!inClimb && grade >= 3) { inClimb = true; climbD0 = dist; climbA0 = alt; climbLastA = alt; climbGainAcc = 0; climbEndRun = dist; }
+            if (inClimb) {
+                if (alt > climbLastA) climbGainAcc += alt - climbLastA;
+                climbLastA = alt;
+                if (grade >= 1) climbEndRun = dist;
+                else if (dist - climbEndRun > 200) inClimb = false;
+            }
             Pt lp = prof.isEmpty() ? null : prof.get(prof.size() - 1);
             if (lp == null || dist - lp.d >= 20) prof.add(new Pt(dist, alt));
             while (!prof.isEmpty() && dist - prof.get(0).d > 5000) prof.remove(0);
@@ -103,8 +117,14 @@ public class Metrics {
         if (cad > 0) { L.cSum += cad; L.cN++; }
     }
 
+    public double avgPower() { return pCnt > 0 ? pTot / pCnt : 0; }
+    public double climbDist() { return inClimb ? dist - climbD0 : 0; }
+    public double climbGain() { return inClimb ? climbGainAcc : 0; }
+    public double climbAvgGrade() { double d = climbDist(); return d > 20 ? 100 * (climbLastA - climbA0) / d : 0; }
+
     public Lap newLap() {
         prevLap = lap;
+        laps.add(lap);
         Lap n = new Lap(); n.n = lap.n + 1; n.dist0 = dist;
         lap = n;
         return prevLap;
