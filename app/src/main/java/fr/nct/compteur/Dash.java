@@ -713,7 +713,7 @@ public class Dash extends View {
 
     /**
      * Radar : au repos, fine ligne verte sur le bord droit (radar connecté, route libre).
-     * Véhicule détecté : large bande colorée avec les véhicules placés selon leur distance (0 en bas, 140 m en haut),
+     * Véhicule détecté : large bande colorée, le cycliste en haut et les véhicules qui remontent depuis le bas (140 m en bas),
      * halo sur tout le bord droit et bandeau du véhicule le plus proche.
      */
     private void drawRadar(Canvas c, long n) {
@@ -738,14 +738,15 @@ public class Dash extends View {
         ps.setColor(col); ps.setStrokeWidth(3); rf.set(x0 + 1.5f, t + 1.5f, x1 + 10, b - 1.5f); c.drawRoundRect(rf, 10, 10, ps);
         // repères de distance
         for (int dm = 50; dm <= 100; dm += 50) {
-            float y = b - 20 - dm / 140f * (b - t - 40);
+            float y = t + 40 + dm / 140f * (b - t - 60);
             pf.setColor(alpha(col, 120)); c.drawRect(x0 + 8, y, x1 - 4, y + 2, pf);
         }
         // vélo
-        pf.setColor(TXT); rf.set(x0 + 12, b - 26, x1 - 8, b - 8); c.drawRoundRect(rf, 5, 5, pf);
+        path.reset(); path.moveTo((x0 + x1) / 2 + 4, t + 12); path.lineTo(x1 - 4, t + 32); path.lineTo((x0 + x1) / 2 + 4, t + 26); path.lineTo(x0 + 12, t + 32); path.close();
+        pf.setColor(TXT); c.drawPath(path, pf);
         // véhicules
         for (int i = 0; i < cnt; i++) {
-            float y = b - 40 - Math.min(140, s.rDist[i]) / 140f * (b - t - 60);
+            float y = t + 58 + Math.min(140, s.rDist[i]) / 140f * (b - t - 80);
             int cc = s.rDist[i] < 40 ? ORANGE : AMBER;
             pf.setColor(cc); rf.set(x0 + 6, y - 18, x1 - 2, y + 18); c.drawRoundRect(rf, 7, 7, pf);
             pf.setColor(alpha(BG2, 200)); rf.set(x0 + 11, y - 12, x1 - 7, y - 4); c.drawRoundRect(rf, 3, 3, pf); // pare-brise
@@ -755,8 +756,8 @@ public class Dash extends View {
         String lbl = (cnt > 1 ? cnt + " VÉHICULES · " : "VÉHICULE · ") + near + " m";
         pt.setTypeface(bc8); pt.setTextSize(22); pt.setLetterSpacing(.04f);
         float w = pt.measureText(lbl) + 28;
-        pf.setColor(col); rf.set(432 - w, t + 4, 432, t + 42); c.drawRoundRect(rf, 19, 19, pf);
-        text(c, lbl, 432 - w / 2, t + 31, bc8, 22, BG, Paint.Align.CENTER, .04f);
+        pf.setColor(col); rf.set(432 - w, b - 44, 432, b - 6); c.drawRoundRect(rf, 19, 19, pf);
+        text(c, lbl, 432 - w / 2, b - 17, bc8, 22, BG, Paint.Align.CENTER, .04f);
     }
 
     /** à chaque échantillon : bip quand un nouveau véhicule apparaît */
