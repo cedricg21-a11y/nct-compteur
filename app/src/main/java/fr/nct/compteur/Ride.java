@@ -38,7 +38,8 @@ public class Ride implements Ble.Listener, LocationListener, SensorEventListener
 
     public static class Sample {
         public int p, hr, cad, bat; public double spd, dist, alt; public String state; public long elapsed;
-        public boolean sPwr, sHr, sGps, sCsc;
+        public boolean sPwr, sHr, sGps, sCsc, sRadar;
+        public int[] rDist = new int[0], rSpd = new int[0], rId = new int[0];
         public double lat = Double.NaN, lon = Double.NaN; public float bearing;
     }
     private float lastBearing = 0;
@@ -187,6 +188,8 @@ public class Ride implements Ble.Listener, LocationListener, SensorEventListener
         s.p = p; s.hr = hr; s.cad = cad; s.spd = spd; s.dist = distM; s.alt = alt;
         s.state = state; s.elapsed = timerS; s.bat = battery();
         s.sPwr = ble.pwrOk(); s.sHr = ble.hrOk(); s.sGps = gpsFix; s.sCsc = ble.cscOk();
+        s.sRadar = ble.radarOk();
+        if (s.sRadar && System.currentTimeMillis() - ble.radarT < 4000) { s.rDist = ble.rDist; s.rSpd = ble.rSpd; s.rId = ble.rId; }
         if (last != null && gpsFix) {
             s.lat = last.getLatitude(); s.lon = last.getLongitude();
         }
@@ -310,7 +313,7 @@ public class Ride implements Ble.Listener, LocationListener, SensorEventListener
 
     @Override public void onSensorEvent(String type, String name, boolean connected) {
         if (ui == null) return;
-        String t = type.equals("pwr") ? "PUISSANCE" : type.equals("hr") ? "CARDIO" : "VITESSE/CADENCE";
+        String t = type.equals("pwr") ? "PUISSANCE" : type.equals("hr") ? "CARDIO" : type.equals("radar") ? "RADAR" : "VITESSE/CADENCE";
         ui.event("sensor", (connected ? "✓ " : "✕ ") + t + " · " + name);
     }
 

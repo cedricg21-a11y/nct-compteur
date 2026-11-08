@@ -39,6 +39,11 @@ public class Sim {
         s.p = (int) Math.round(p); s.hr = (int) Math.round(hr); s.cad = (int) Math.round(cad);
         s.spd = spd; s.dist = dist; s.alt = alt; s.state = state; s.elapsed = t; s.bat = 87;
         s.sPwr = s.sHr = s.sGps = true;
+        // radar simulé : un véhicule approche toutes les 45 s
+        long ph = t % 45;
+        s.sRadar = true;
+        if (ph < 12) { s.rId = new int[]{(int) (t / 45) % 200}; s.rDist = new int[]{(int) Math.max(5, 140 - ph * 12)}; s.rSpd = new int[]{14}; }
+        if (ph >= 4 && ph < 10) { s.rId = new int[]{(int) (t / 45) % 200, 201}; s.rDist = new int[]{(int) Math.max(5, 140 - ph * 12), 128}; s.rSpd = new int[]{14, 9}; }
         s.lat = lat; s.lon = lon; s.bearing = (float) ((brg % 360 + 360) % 360);
         return s;
     }

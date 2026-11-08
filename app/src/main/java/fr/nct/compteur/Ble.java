@@ -37,6 +37,9 @@ public class Ble {
     static final UUID SVC_HR = u16(0x180D), CHR_HR = u16(0x2A37);
     static final UUID SVC_CSC = u16(0x1816), CHR_CSC = u16(0x2A5B);
     static final UUID CCCD = u16(0x2902);
+    // radar Garmin Varia (service propriétaire, protocole décodé par la communauté)
+    static final UUID SVC_RADAR = UUID.fromString("6a4e3200-667b-11e3-949a-0800200c9a66");
+    static final UUID CHR_RADAR = UUID.fromString("6a4e3203-667b-11e3-949a-0800200c9a66");
 
     public interface Listener { void onSensorEvent(String type, String name, boolean connected); }
 
@@ -55,7 +58,10 @@ public class Ble {
     private BluetoothAdapter adapter;
     private BluetoothLeScanner scanner;
     private boolean scanning;
-    final Link pwr = new Link("pwr"), hr = new Link("hr"), csc = new Link("csc");
+    final Link pwr = new Link("pwr"), hr = new Link("hr"), csc = new Link("csc"), radar = new Link("radar");
+    // menaces radar : distance (m) et vitesse brute par véhicule
+    volatile int[] rDist = new int[0], rSpd = new int[0], rId = new int[0];
+    volatile long radarT = 0; volatile String radarRaw = "";
 
     // dernières valeurs
     volatile int power = 0, heartRate = 0, cadence = 0;
@@ -77,7 +83,7 @@ public class Ble {
         if (adapter == null) return;
         if (!adapter.isEnabled()) { adapter.enable(); h.postDelayed(this::start, 2500); return; }
         // reconnexion directe aux capteurs mémorisés
-        for (Link l : new Link[]{pwr, hr, csc}) {
+        for (Link l : new Link[]{pwr, hr, csc, radar}) {
             String addr = prefs.getString(l.type, null);
             if (addr != null && l.gatt == null) connect(l, adapter.getRemoteDevice(addr));
         }
@@ -88,7 +94,7 @@ public class Ble {
     public void stop() {
         stopScan();
         h.removeCallbacks(watchdog);
-        for (Link l : new Link[]{pwr, hr, csc}) if (l.gatt != null) { l.gatt.close(); l.gatt = null; l.connected = false; }
+        for (Link l : new Link[]{pwr, hr, csc, radar}) if (l.gatt != null) { l.gatt.close(); l.gatt = null; l.connected = false; }
     }
 
     /**
@@ -105,7 +111,7 @@ public class Ble {
         }
         long now = System.currentTimeMillis();
         boolean did = false;
-        for (Link l : new Link[]{pwr, hr, csc}) {
+        for (Link l : new Link[]{pwr, hr, csc, radar}) {
             String addr = prefs.getString(l.type, null);
             if (addr == null || l.connected) continue;
             if (l.gatt != null && now - l.connectT < 10000) continue; // connexion en cours
@@ -139,7 +145,7 @@ public class Ble {
 
     public String saved(String type) { return prefs.getString(type, null); }
 
-    public Link linkFor(String type) { return type.equals("pwr") ? pwr : type.equals("hr") ? hr : csc; }
+    public Link linkFor(String type) { return type.equals("pwr") ? pwr : type.equals("hr") ? hr : type.equals("radar") ? radar : csc; }
 
     /** Enregistre ce capteur pour son type (remplace l'ancien) et s'y connecte. */
     public void pair(Found f) {
@@ -167,6 +173,8 @@ public class Ble {
         f.add(new ScanFilter.Builder().setServiceUuid(new ParcelUuid(SVC_PWR)).build());
         f.add(new ScanFilter.Builder().setServiceUuid(new ParcelUuid(SVC_HR)).build());
         f.add(new ScanFilter.Builder().setServiceUuid(new ParcelUuid(SVC_CSC)).build());
+        f.add(new ScanFilter.Builder().setServiceUuid(new ParcelUuid(SVC_RADAR)).build());
+        if (keepScan) f = null; // écran Capteurs : recherche large (le radar n'annonce pas toujours son service)
         ScanSettings s = new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build();
         try { scanner.startScan(f, s, scanCb); scanning = true; } catch (Exception e) { Log.e(TAG, "scan", e); }
         h.postDelayed(this::stopScan, keepScan ? 15000 : 30000);
@@ -175,7 +183,7 @@ public class Ble {
     /** nombre de capteurs enregistrés mais pas connectés */
     private int missingSaved() {
         int n = 0;
-        for (Link l : new Link[]{pwr, hr, csc}) if (prefs.getString(l.type, null) != null && l.gatt == null) n++;
+        for (Link l : new Link[]{pwr, hr, csc, radar}) if (prefs.getString(l.type, null) != null && l.gatt == null) n++;
         return n;
     }
 
@@ -201,10 +209,13 @@ public class Ble {
         @Override public void onScanResult(int cb, ScanResult r) {
             if (r.getScanRecord() == null) return;
             List<ParcelUuid> u = r.getScanRecord().getServiceUuids();
-            if (u == null) return;
             BluetoothDevice d = r.getDevice();
-            String type = u.contains(new ParcelUuid(SVC_PWR)) ? "pwr" : u.contains(new ParcelUuid(SVC_HR)) ? "hr"
-                    : u.contains(new ParcelUuid(SVC_CSC)) ? "csc" : null;
+            String nm = r.getScanRecord().getDeviceName();
+            if (nm == null) nm = d.getName();
+            String type = null;
+            if (u != null) type = u.contains(new ParcelUuid(SVC_RADAR)) ? "radar" : u.contains(new ParcelUuid(SVC_PWR)) ? "pwr"
+                    : u.contains(new ParcelUuid(SVC_HR)) ? "hr" : u.contains(new ParcelUuid(SVC_CSC)) ? "csc" : null;
+            if (type == null && nm != null && nm.toUpperCase().matches(".*(RTL|VARIA|REARVUE|RADAR).*")) type = "radar";
             if (type == null) return;
             Found f = found.get(d.getAddress());
             if (f == null) { f = new Found(); f.addr = d.getAddress(); f.type = type; found.put(f.addr, f); }
@@ -252,8 +263,8 @@ public class Ble {
         }
 
         @Override public void onServicesDiscovered(BluetoothGatt g, int status) {
-            UUID svc = l.type.equals("pwr") ? SVC_PWR : l.type.equals("hr") ? SVC_HR : SVC_CSC;
-            UUID chr = l.type.equals("pwr") ? CHR_PWR : l.type.equals("hr") ? CHR_HR : CHR_CSC;
+            UUID svc = l.type.equals("pwr") ? SVC_PWR : l.type.equals("hr") ? SVC_HR : l.type.equals("radar") ? SVC_RADAR : SVC_CSC;
+            UUID chr = l.type.equals("pwr") ? CHR_PWR : l.type.equals("hr") ? CHR_HR : l.type.equals("radar") ? CHR_RADAR : CHR_CSC;
             BluetoothGattService s = g.getService(svc);
             if (s == null) { g.disconnect(); return; }
             BluetoothGattCharacteristic c = s.getCharacteristic(chr);
@@ -270,11 +281,12 @@ public class Ble {
 
         @Override public void onCharacteristicChanged(BluetoothGatt g, BluetoothGattCharacteristic c) {
             byte[] v = c.getValue();
-            if (v == null || v.length < 2) return;
+            if (v == null || v.length < 1 || (v.length < 2 && !l.type.equals("radar"))) return;
             l.lastData = System.currentTimeMillis();
             try {
                 if (l.type.equals("hr")) parseHr(v);
                 else if (l.type.equals("pwr")) parsePower(v);
+                else if (l.type.equals("radar")) parseRadar(v);
                 else parseCsc(v);
             } catch (Exception e) { Log.w(TAG, "parse " + l.type, e); }
         }
@@ -339,4 +351,22 @@ public class Ble {
     boolean pwrOk() { return pwr.connected; }
     boolean hrOk() { return hr.connected; }
     boolean cscOk() { return csc.connected; }
+    boolean radarOk() { return radar.connected; }
+
+    /**
+     * Paquet radar Varia (format communautaire) : octet 0 = en-tête, puis par véhicule 3 octets :
+     * identifiant, distance en mètres, vitesse/niveau. Un paquet d'1 octet = route libre.
+     */
+    void parseRadar(byte[] v) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < Math.min(v.length, 16); i++) sb.append(String.format("%02X ", v[i]));
+        radarRaw = sb.toString().trim();
+        radarT = System.currentTimeMillis();
+        int n = Math.max(0, (v.length - 1) / 3);
+        int[] id = new int[n], d = new int[n], sp = new int[n];
+        for (int k = 0; k < n; k++) {
+            id[k] = u8(v, 1 + 3 * k); d[k] = u8(v, 2 + 3 * k); sp[k] = u8(v, 3 + 3 * k);
+        }
+        rId = id; rDist = d; rSpd = sp;
+    }
 }

@@ -21,7 +21,7 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
     private MapHolder map;
     private Wind wind;
     private android.media.SoundPool sounds;
-    private int bellId;
+    private int bellId, radarId;
     private Ride ride;
     private SharedPreferences keys, cfg;
     private boolean learning, errorScreen;
@@ -60,6 +60,7 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
                         .setUsage(android.media.AudioAttributes.USAGE_ALARM)
                         .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION).build()).build();
         bellId = sounds.load(this, R.raw.bell, 1);
+        radarId = sounds.load(this, R.raw.radar, 1);
         dash = new Dash(this, this);
         try { dash.version = getPackageManager().getPackageInfo(getPackageName(), 0).versionName; } catch (Exception ignored) {}
         dash.setCfg(cfg.getInt("ftp", 250), cfg.getInt("hrMax", 185), cfg.getFloat("weight", 72f));
@@ -239,6 +240,28 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
             }, 1600);
         } catch (Exception ignored) {}
         sounds.play(bellId, pct / 100f, pct / 100f, 1, 0, 1f);
+    }
+
+    @Override public void radarBeep() {
+        if (sounds == null) return;
+        try {
+            android.media.AudioManager am = (android.media.AudioManager) getSystemService(AUDIO_SERVICE);
+            int max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_ALARM);
+            if (savedVol < 0) savedVol = am.getStreamVolume(android.media.AudioManager.STREAM_ALARM);
+            am.setStreamVolume(android.media.AudioManager.STREAM_ALARM, max, 0);
+            bellH.removeCallbacksAndMessages(null);
+            bellH.postDelayed(() -> {
+                try { if (savedVol >= 0) am.setStreamVolume(android.media.AudioManager.STREAM_ALARM, savedVol, 0); } catch (Exception ignored) {}
+                savedVol = -1;
+            }, 900);
+        } catch (Exception ignored) {}
+        sounds.play(radarId, 1f, 1f, 1, 0, 1f);
+    }
+
+    @Override public String radarDebug() {
+        if (sim != null || ride == null || ride.ble.radarRaw.isEmpty()) return "";
+        long age = (System.currentTimeMillis() - ride.ble.radarT) / 1000;
+        return "Radar (données brutes, il y a " + age + " s) : " + ride.ble.radarRaw;
     }
 
     @Override public int bellVolume() { return cfg.getInt("bellVol", 100); }

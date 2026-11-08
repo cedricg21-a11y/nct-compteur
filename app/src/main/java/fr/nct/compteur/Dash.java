@@ -29,6 +29,8 @@ public class Dash extends View {
     public interface Host {
         void startStop();
         void bell();
+        void radarBeep();
+        String radarDebug();
         int bellVolume();
         void setBellVolume(int pct);
         boolean blockSleep();
@@ -257,6 +259,7 @@ public class Dash extends View {
         // arrêt prolongé en pause auto (> 1 min) : le menu de pause s'ouvre tout seul
         if (state.equals("auto") && !pauseMenu && !autoMenuShown && now() - autoSince > 60000) { pauseMenu = true; pauseSel = 0; autoMenuShown = true; }
         if (!state.equals("auto")) autoMenuShown = false;
+        radarCheck();
         m.push(x.p, x.hr, x.cad, x.spd, x.alt, x.dist, state.equals("rec"));
         double p3 = m.p3();
         set("pwr", p3); set("wkg", p3 / m.weight); set("pftp", 100 * p3 / m.ftp);
@@ -703,6 +706,51 @@ public class Dash extends View {
         cell(c, 2, gridT + rh, "ALTITUDE", i0(v("alt")), TXT, null);
     }
 
+    // ---------------------------------------------------------------- RADAR (Varia)
+
+    private final java.util.HashSet<Integer> radarSeen = new java.util.HashSet<>();
+    private long radarFlashT;
+
+    /** bande radar sur le bord droit : véhicules positionnés selon leur distance (0 en bas, 140 m en haut) */
+    private void drawRadar(Canvas c, long n) {
+        if (!s.sRadar) return;
+        float t = HDR + 8, b = H - BAND - 8, x0 = 468, x1 = 478;
+        int cnt = s.rDist.length;
+        boolean danger = false;
+        for (int i = 0; i < cnt; i++) if (s.rDist[i] < 40) danger = true;
+        int col = cnt == 0 ? 0x5500E5C8 : danger ? 0xFFE85022 : 0xFFFFB02E;
+        if (cnt > 0) {
+            // halo sur le bord droit
+            pf.setShader(new LinearGradient(480 - 60, 0, 480, 0, 0x00000000, alpha(col, 110), Shader.TileMode.CLAMP));
+            c.drawRect(420, t, 480, b, pf); pf.setShader(null);
+        }
+        pf.setColor(cnt == 0 ? 0x3300E5C8 : alpha(col, 90)); rf.set(x0, t, x1, b); c.drawRoundRect(rf, 5, 5, pf);
+        // vélo en bas
+        pf.setColor(TXT); c.drawCircle((x0 + x1) / 2, b - 6, 5, pf);
+        for (int i = 0; i < cnt; i++) {
+            float y = b - 14 - Math.min(140, s.rDist[i]) / 140f * (b - t - 24);
+            int cc = s.rDist[i] < 40 ? ORANGE : AMBER;
+            pf.setColor(cc); rf.set(x0 - 9, y - 11, x1 + 1, y + 11); c.drawRoundRect(rf, 4, 4, pf);
+            ps.setColor(BG2); ps.setStrokeWidth(2); c.drawRoundRect(rf, 4, 4, ps);
+        }
+        if (cnt > 0) {
+            String lbl = cnt + (cnt > 1 ? " VÉHICULES" : " VÉHICULE");
+            pt.setTypeface(bc8); pt.setTextSize(16); pt.setLetterSpacing(.06f);
+            float w = pt.measureText(lbl) + 20;
+            pf.setColor(col); rf.set(460 - w, t, 460, t + 28); c.drawRoundRect(rf, 14, 14, pf);
+            text(c, lbl, 460 - w / 2, t + 20, bc8, 16, BG, Paint.Align.CENTER, .06f);
+        }
+    }
+
+    /** à chaque échantillon : bip quand un nouveau véhicule apparaît */
+    private void radarCheck() {
+        boolean fresh = false;
+        java.util.HashSet<Integer> now = new java.util.HashSet<>();
+        for (int id : s.rId) { now.add(id); if (!radarSeen.contains(id)) fresh = true; }
+        radarSeen.clear(); radarSeen.addAll(now);
+        if (fresh && !quiet) { host.radarBeep(); radarFlashT = now(); }
+    }
+
     // ---------------------------------------------------------------- CARTE
 
     private void pageMap(Canvas c, float top, float bottom) {
@@ -992,6 +1040,7 @@ public class Dash extends View {
         c.restore();
 
         drawFooter(c);
+        if (mode == M_DASH && !summary) drawRadar(c, n);
         if (mode != M_DASH) drawMenus(c, n);
         if (pauseMenu && (state.equals("pause") || state.equals("auto"))) drawPauseMenu(c, n);
         else if (pauseMenu) pauseMenu = false;
@@ -1374,12 +1423,14 @@ public class Dash extends View {
             for (int i = start; i < Math.min(sensCache.size(), start + max); i++) {
                 Ble.Found f = sensCache.get(i);
                 String st = host.sensorStatus(f);
-                String tl = f.type.equals("pwr") ? "PUISSANCE" : f.type.equals("hr") ? "CARDIO" : "VITESSE / CADENCE";
+                String tl = f.type.equals("pwr") ? "PUISSANCE" : f.type.equals("hr") ? "CARDIO" : f.type.equals("radar") ? "RADAR" : "VITESSE / CADENCE";
                 boolean fresh = n - f.seen < 15000;
                 String chip = st.equals("on") ? "CONNECTÉ" : st.equals("saved") ? "CONNEXION…" : fresh ? "AJOUTER" : "HORS DE PORTÉE";
                 int col = st.equals("on") ? CYAN : st.equals("saved") ? AMBER : fresh ? 0xFF5F7A94 : 0xFF2E3B4A;
                 row(c, i - start + 1, i == sel, tl + (st.isEmpty() ? "" : "  ·  ENREGISTRÉ"), f.name, chip, col);
             }
+            String rd = host.radarDebug();
+            if (!rd.isEmpty()) text(c, rd, 240, H - 74, b6, 11, DIM, Paint.Align.CENTER, 0);
         } else if (mode == M_PROF) {
             panelHeader(c, "PROFIL", profEdit ? "VALIDER  ✓" : profSel == 3 ? "ACTIVER / DÉSACTIVER" : "MODIFIER  ›");
             String[] lab = {"FTP", "FC MAX", "POIDS", "PAUSE AUTOMATIQUE"};
