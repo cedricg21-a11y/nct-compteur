@@ -55,7 +55,8 @@ public class Dash extends View {
     private LinearGradient arcGrad, brandGrad;
 
     private float sc = 1, H = 800;
-    private final long born = System.currentTimeMillis();
+    private long born = System.currentTimeMillis();
+    public boolean quiet;
 
     // pages
     private int cur = 0, prev = 0, dir = 1;
@@ -115,7 +116,7 @@ public class Dash extends View {
     public void onSample(Ride.Sample x) {
         String was = state;
         s = x; state = x.state;
-        if (!state.equals(was)) {
+        if (!state.equals(was) && !quiet) {
             if (state.equals("rec")) toast(was.equals("pause") ? "REPRISE" : "C'EST PARTI !", CYAN);
             else if (state.equals("pause")) toast("PAUSE", AMBER);
         }
@@ -223,6 +224,10 @@ public class Dash extends View {
         if (i == cur) return;
         prev = cur; cur = i; dir = d; pageT = now();
     }
+
+    public void showPageNow(int i) { cur = (i + PAGES.length) % PAGES.length; prev = cur; pageT = 0; invalidate(); }
+    public void skipSplash() { born = 0; }
+    public void newLapQuiet() { m.newLap(); }
 
     public void toast(String t, int col) { toastTxt = t; toastCol = col; toastT = now(); invalidate(); }
 

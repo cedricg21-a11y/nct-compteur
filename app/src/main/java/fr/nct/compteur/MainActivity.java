@@ -52,11 +52,29 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
         setContentView(dash);
 
         ride = Ride.get(this);
+        if (getIntent().getStringExtra("demo") != null) { startDemo(); return; }
         ride.attach(this);
         askPermissions();
 
         // premier lancement : apprentissage des boutons après le splash
-        if (keys.getString("map", "").isEmpty()) new Handler().postDelayed(() -> dash.startLearn(), 3300);
+        if (sim == null && keys.getString("map", "").isEmpty()) new Handler().postDelayed(() -> dash.startLearn(), 3300);
+    }
+
+    // mode démo : adb shell am start -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 1500 --ei page 0 --ei lap 900
+    private Sim sim;
+    private final Handler demoH = new Handler();
+    private void startDemo() {
+        sim = new Sim();
+        int ff = getIntent().getIntExtra("ff", 0), lapAt = getIntent().getIntExtra("lap", -1);
+        if (getIntent().getStringExtra("splash") == null) dash.skipSplash();
+        dash.quiet = true;
+        for (int i = 0; i < ff; i++) {
+            dash.onSample(sim.step());
+            if (sim.time() == lapAt) dash.newLapQuiet();
+        }
+        dash.quiet = getIntent().getStringExtra("toast") == null;
+        dash.showPageNow(getIntent().getIntExtra("page", 0));
+        demoH.post(new Runnable() { @Override public void run() { dash.onSample(sim.step()); demoH.postDelayed(this, 1000); } });
     }
 
     private void showError(String msg) {
@@ -97,6 +115,7 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
     }
 
     @Override protected void onDestroy() {
+        demoH.removeCallbacksAndMessages(null);
         if (ride != null) ride.detach(this);
         super.onDestroy();
     }
@@ -108,6 +127,12 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
         if (errorScreen) { recreate(); return true; }
         if (e.getRepeatCount() > 0) return true;
         if (learning) { dash.onKey(code); return true; }
+        if (sim != null) {
+            String a = actionFor(code);
+            if ("startstop".equals(a)) { sim.state = sim.state.equals("rec") ? "pause" : "rec"; return true; }
+            if (a != null && !"lap".equals(a)) { dash.button(a); return true; }
+            if ("lap".equals(a)) { dash.newLapQuiet(); return true; }
+        }
         String action = actionFor(code);
         if (action != null) { dash.button(action); return true; }
         if (code == KeyEvent.KEYCODE_BACK) return super.onKeyDown(code, e);

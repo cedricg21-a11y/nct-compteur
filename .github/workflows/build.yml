@@ -22,11 +22,52 @@ jobs:
           gradle-version: '8.7'
       - name: Compilation
         run: gradle :app:assembleRelease --no-daemon --stacktrace
+      - run: cp app/build/outputs/apk/release/app-release.apk nct-compteur.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: nct-compteur.apk
       - name: Publication de l'APK
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cp app/build/outputs/apk/release/app-release.apk nct-compteur.apk
           gh release create "v0.1.${{ github.run_number }}" nct-compteur.apk \
             --title "NCT Compteur v0.1.${{ github.run_number }}" \
             --notes "${{ github.event.head_commit.message }}" --latest
+
+  screenshots:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk
+      - name: Activer KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Émulateur Android 8.1 (480x800) + captures
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 27
+          arch: x86
+          target: default
+          profile: Nexus S
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: |
+            mkdir -p shots
+            adb install -r nct-compteur.apk
+            adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 -e splash 1 ; sleep 2 ; adb exec-out screencap -p > shots/0-splash.png
+            adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 1000 --ei page 0 ; sleep 4 ; adb exec-out screencap -p > shots/1-live.png
+            adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 2600 --ei page 1 ; sleep 4 ; adb exec-out screencap -p > shots/2-effort.png
+            adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 1500 --ei page 2 ; sleep 4 ; adb exec-out screencap -p > shots/3-grimpee.png
+            adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 2400 --ei lap 1500 --ei page 3 ; sleep 4 ; adb exec-out screencap -p > shots/4-tour.png
+            adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity ; sleep 6 ; adb exec-out screencap -p > shots/5-premier-lancement.png
+            adb logcat -d -s AndroidRuntime:E NCT-RIDE:* NCT-BLE:* > shots/logcat.txt || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: shots/
