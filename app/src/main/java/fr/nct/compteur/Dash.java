@@ -28,6 +28,7 @@ public class Dash extends View {
 
     public interface Host {
         void startStop();
+        void bell();
         boolean blockSleep();
         void setBlockSleep(boolean on);
         void discardRide();
@@ -438,7 +439,8 @@ public class Dash extends View {
 
     public void toast(String t, int col) { toastTxt = t; toastCol = col; toastT = now(); invalidate(); }
 
-    private float sx0;
+    private float sx0, lastTapX, lastTapY;
+    private long lastTapT;
     private boolean ignoreUp;
     @Override public boolean onTouchEvent(MotionEvent e) {
         if (e.getAction() == MotionEvent.ACTION_DOWN) {
@@ -471,6 +473,14 @@ public class Dash extends View {
             if (mode != M_DASH) { menuTap(x, y); return true; }
             boolean paused = state.equals("pause") || state.equals("auto");
             if (paused && Math.abs(dx) < 30 && y > H - BAND - 58 && y < H - BAND - 8) { button(x < 240 ? "startstop" : "lap"); return true; }
+            // double appui sur la zone de données : sonnette
+            if (Math.abs(dx) < 20 && y > HDR + 4 && y < H - BAND - 4) {
+                long tn = now();
+                if (tn - lastTapT < 380 && Math.abs(x - lastTapX) < 60 && Math.abs(y - lastTapY) < 60) {
+                    lastTapT = 0; host.bell(); toast("DRING DRING !", CYAN); return true;
+                }
+                lastTapT = tn; lastTapX = x; lastTapY = y;
+            }
             if (Math.abs(dx) > 60) button(dx < 0 ? "next" : "prev");
             else if (y < 56) openMenu();              // appui sur l'en-tête : menu
             else if (y > H - BAND && x < 240) button("startstop");

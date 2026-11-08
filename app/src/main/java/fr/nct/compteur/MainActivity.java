@@ -20,6 +20,8 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
     private Dash dash;
     private MapHolder map;
     private Wind wind;
+    private android.media.SoundPool sounds;
+    private int bellId;
     private Ride ride;
     private SharedPreferences keys, cfg;
     private boolean learning, errorScreen;
@@ -53,6 +55,11 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
 
         applyBrightness();
         wind = new Wind(this);
+        sounds = new android.media.SoundPool.Builder().setMaxStreams(2)
+                .setAudioAttributes(new android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION).build()).build();
+        bellId = sounds.load(this, R.raw.bell, 1);
         dash = new Dash(this, this);
         try { dash.version = getPackageManager().getPackageInfo(getPackageName(), 0).versionName; } catch (Exception ignored) {}
         dash.setCfg(cfg.getInt("ftp", 250), cfg.getInt("hrMax", 185), cfg.getFloat("weight", 72f));
@@ -212,6 +219,8 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
     }
 
     // ------------------------------------------------------------ Dash.Host
+
+    @Override public void bell() { if (sounds != null) sounds.play(bellId, 1f, 1f, 1, 0, 1f); }
 
     @Override public void startStop() {
         if (sim != null) { sim.state = sim.state.equals("rec") ? "pause" : "rec"; sample(sim.step()); return; }
