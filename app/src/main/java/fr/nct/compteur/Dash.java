@@ -223,8 +223,13 @@ public class Dash extends View {
 
     public boolean isLearning() { return learnStep >= 0; }
 
+    // résumé de fin de sortie
+    private boolean summary;
+    private String sumTime = "", sumDist = "", sumDplus = "", sumNp = "", sumTss = "", sumKj = "", sumSpd = "", sumFile;
+
     public void button(String b) {
         if (learnStep >= 0) return;
+        if (summary) { summary = false; invalidate(); return; }
         if (mode != M_DASH) { menuButton(b); return; }
         switch (b) {
             case "next": showPage(cur + 1, 1); break;
@@ -239,9 +244,14 @@ public class Dash extends View {
                     lapFlashT = now();
                 } else if (state.equals("pause")) {
                     if (confirmed("finish")) {
+                        // résumé de la sortie avant remise à zéro
+                        sumTime = ms(s.elapsed); sumDist = String.format(Locale.US, "%.2f", m.dist / 1000);
+                        sumDplus = String.valueOf(Math.round(m.dplus)); sumNp = i0(m.np()); sumTss = i0(m.tss());
+                        sumKj = i0(m.kj); sumSpd = f1(m.spdAvg());
                         String f = host.finishRide();
+                        sumFile = f != null && !f.isEmpty() ? f : null;
+                        summary = true;
                         m.reset(); lastZone = -1;
-                        toast(f != null && !f.isEmpty() ? "SORTIE ENREGISTRÉE ✓" : "SORTIE TERMINÉE", CYAN);
                     } else confirm("finish", "TERMINER LA SORTIE ?", "TOUR : enregistrer le fichier .FIT", "START : reprendre");
                 } else openMenu();
                 break;
@@ -288,6 +298,7 @@ public class Dash extends View {
     public void showPageNow(int i) { cur = (i + PAGES.length) % PAGES.length; prev = cur; pageT = 0; invalidate(); }
     public void skipSplash() { born = 0; }
     public void newLapQuiet() { m.newLap(); }
+    public void demoSummary() { state = "pause"; confirmKind = "finish"; confirmUntil = now() + 4000; button("lap"); }
 
     public void toast(String t, int col) { toastTxt = t; toastCol = col; toastT = now(); invalidate(); }
 
@@ -297,6 +308,7 @@ public class Dash extends View {
         if (e.getAction() == MotionEvent.ACTION_UP) {
             float dx = (e.getX() - sx0) / sc, x = e.getX() / sc, y = e.getY() / sc;
             if (learnStep >= 0) return true;
+            if (summary) { summary = false; invalidate(); return true; }
             if (mode != M_DASH) { menuTap(x, y); return true; }
             if (Math.abs(dx) > 60) button(dx < 0 ? "next" : "prev");
             else if (y < 56) openMenu();              // appui sur l'en-tête : menu
@@ -646,6 +658,16 @@ public class Dash extends View {
     // ---------------------------------------------------------------- overlays
 
     private void drawOverlays(Canvas c, long n) {
+        // bandeau pause : rappel des actions
+        if (state.equals("pause") && mode == M_DASH && n >= confirmUntil && !summary) {
+            float y = H - 64 - 58;
+            pf.setColor(0xF2120E06); rf.set(12, y, 468, y + 50); c.drawRoundRect(rf, 14, 14, pf);
+            ps.setColor(AMBER); ps.setStrokeWidth(2); c.drawRoundRect(rf, 14, 14, ps);
+            text(c, "START  reprendre", 128, y + 32, bc7, 20, AMBER, Paint.Align.CENTER, .06f);
+            pf.setColor(0x66FFB02E); c.drawRect(239, y + 12, 241, y + 38, pf);
+            text(c, "TOUR  terminer", 354, y + 32, bc7, 20, TXT, Paint.Align.CENTER, .06f);
+        }
+        if (summary) { drawSummary(c); return; }
         // toast
         if (toastTxt != null) {
             long e = n - toastT;
@@ -686,6 +708,26 @@ public class Dash extends View {
             text(c, LEARN[learnStep][1], 240, H / 2 + 20, bc8, 56, CYAN, Paint.Align.CENTER, .02f);
             text(c, learnErr, 240, H / 2 + 80, bc6, 20, ORANGE, Paint.Align.CENTER, 0);
         }
+    }
+
+    private void drawSummary(Canvas c) {
+        pf.setColor(0xFA090E14); c.drawRect(0, 0, 480, H, pf);
+        drawGlowStatic(c);
+        text(c, "SORTIE TERMINÉE", 240, 92, bc8, 44, TXT, Paint.Align.CENTER, .04f);
+        brand(c, 140, 108, 340, 112);
+        text(c, sumFile != null ? "Fichier .FIT enregistré ✓" : "Aucun fichier enregistré", 240, 142, b6, 16, sumFile != null ? CYAN : ORANGE, Paint.Align.CENTER, 0);
+        String[][] it = {{"DURÉE", sumTime, ""}, {"DISTANCE", sumDist, "KM"}, {"VITESSE MOY", sumSpd, "KM/H"}, {"DÉNIVELÉ +", sumDplus, "M"},
+                {"NP", sumNp, "W"}, {"TSS", sumTss, ""}, {"TRAVAIL", sumKj, "KJ"}};
+        float t = 166, rh = Math.min(84, (H - 64 - 20 - t - 30) / 4);
+        for (int i = 0; i < it.length; i++) {
+            float x = i % 2 == 0 ? 12 : 246, y = t + (i / 2) * (rh + 8);
+            float w = (i == it.length - 1) ? 456 : 222;
+            tile(c, x, y, x + w, y + rh, it[i][0], null);
+            valUnit(c, x + 14, y + rh - 14, it[i][1], 44, it[i][2]);
+        }
+        if (sumFile != null) text(c, "NCT / " + sumFile, 240, H - 64 - 14, b6, 13, DIM, Paint.Align.CENTER, 0);
+        pf.setColor(0xE6090E14); c.drawRect(0, H - 64, 480, H, pf);
+        text(c, "Appuie sur un bouton pour continuer", 240, H - 26, b6, 15, MUTE, Paint.Align.CENTER, 0);
     }
 
     private void drawSplash(Canvas c, long n) {

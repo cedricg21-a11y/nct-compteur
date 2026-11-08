@@ -75,7 +75,9 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
         dash.quiet = getIntent().getStringExtra("toast") == null;
         dash.showPageNow(getIntent().getIntExtra("page", 0));
         int md = getIntent().getIntExtra("mode", 0);
-        if (md > 0) dash.openMode(md);
+        if (md > 0 && md < 8) dash.openMode(md);
+        if (md == 9) dash.demoSummary();
+        if (md == 8) { sim.state = "pause"; dash.onSample(sim.step()); }
         demoH.post(new Runnable() { @Override public void run() { dash.onSample(sim.step()); demoH.postDelayed(this, 1000); } });
     }
 
@@ -182,7 +184,7 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
 
     @Override public void startStop() { ride.startStop(); }
     @Override public void lap() { ride.lap(); }
-    @Override public String finishRide() { return ride.finish(); }
+    @Override public String finishRide() { return sim != null ? "2026-11-08_16-10_NCT.fit" : ride.finish(); }
     @Override public void setLearning(boolean on) { learning = on; }
     @Override public java.util.List<Ble.Found> sensorList() {
         java.util.List<Ble.Found> l = new java.util.ArrayList<>();
