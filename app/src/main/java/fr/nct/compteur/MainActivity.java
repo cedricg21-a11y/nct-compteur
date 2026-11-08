@@ -155,7 +155,7 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
 
     @Override public void startStop() { ride.startStop(); }
     @Override public void lap() { ride.lap(); }
-    @Override public String finish() { return ride.finish(); }
+    @Override public String finishRide() { return ride.finish(); }
     @Override public void setLearning(boolean on) { learning = on; }
     @Override public void saveKeyMap(Map<Integer, String> map) {
         try {

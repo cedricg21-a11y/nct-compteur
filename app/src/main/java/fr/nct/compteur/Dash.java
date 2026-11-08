@@ -29,7 +29,7 @@ public class Dash extends View {
     public interface Host {
         void startStop();
         void lap();
-        String finish();
+        String finishRide();
         void saveKeyMap(Map<Integer, String> map);
         void setLearning(boolean on);
     }
@@ -175,7 +175,7 @@ public class Dash extends View {
                     lapFlashT = now();
                 } else if (state.equals("pause")) {
                     if (confirmed("finish")) {
-                        String f = host.finish();
+                        String f = host.finishRide();
                         m.reset(); lastZone = -1;
                         toast(f != null && !f.isEmpty() ? "SORTIE ENREGISTRÉE ✓" : "SORTIE TERMINÉE", CYAN);
                     } else confirm("finish", "TERMINER LA SORTIE ?", "TOUR : enregistrer le fichier .FIT", "START : reprendre");
