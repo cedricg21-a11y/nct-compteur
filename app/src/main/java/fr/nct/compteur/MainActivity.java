@@ -93,7 +93,7 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
         if (md == 9) dash.demoSummary();
         if (md == 10) dash.goHome();
         if (md == 11) dash.openMode(5);
-        if (md == 8) { sim.state = "pause"; dash.onSample(sim.step()); }
+        if (md == 8) { dash.quiet = false; sim.state = "pause"; dash.onSample(sim.step()); }
         demoH.post(new Runnable() { @Override public void run() { sample(sim.step()); demoH.postDelayed(this, 1000); } });
     }
 
@@ -203,7 +203,11 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
 
     // ------------------------------------------------------------ Dash.Host
 
-    @Override public void startStop() { ride.startStop(); }
+    @Override public void startStop() {
+        if (sim != null) { sim.state = sim.state.equals("rec") ? "pause" : "rec"; sample(sim.step()); return; }
+        ride.startStop();
+    }
+    @Override public void discardRide() { if (map != null) map.clearTrack(); if (sim == null) ride.discard(); }
     @Override public void lap() { ride.lap(); }
     @Override public String finishRide() {
         if (map != null) map.clearTrack();

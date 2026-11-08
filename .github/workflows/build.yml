@@ -80,6 +80,7 @@ jobs:
             adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 0 --ei mode 10 ; sleep 3 ; adb exec-out screencap -p > shots/0b-accueil.png
             adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 0 --ei mode 11 ; sleep 3 ; adb exec-out screencap -p > shots/0c-historique.png
             adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity -e demo 1 --ei ff 3000 --ei mode 8 ; sleep 3 ; adb exec-out screencap -p > shots/9a-pause.png
+            adb shell input keyevent 4 ; sleep 1
             adb shell am force-stop fr.nct.compteur ; adb shell am start -W -n fr.nct.compteur/.MainActivity ; sleep 6 ; adb exec-out screencap -p > shots/8-premier-lancement.png
             adb logcat -d -s AndroidRuntime:E NCT-RIDE:* NCT-BLE:* NCT-MAP:* > shots/logcat.txt || true
       - name: Publication des captures (branche screens)

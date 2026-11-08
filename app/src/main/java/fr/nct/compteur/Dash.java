@@ -28,6 +28,7 @@ public class Dash extends View {
 
     public interface Host {
         void startStop();
+        void discardRide();
         void lap();
         String finishRide();
         void saveKeyMap(Map<Integer, String> map);
@@ -234,7 +235,7 @@ public class Dash extends View {
         if (!state.equals(was) && !quiet) {
             if (state.equals("rec")) toast(was.equals("pause") || was.equals("auto") ? "REPRISE" : "C'EST PARTI !", CYAN);
             else if (state.equals("auto")) toast("PAUSE AUTO", AMBER);
-            else if (state.equals("pause")) toast("PAUSE", AMBER);
+            else if (state.equals("pause")) { pauseMenu = true; pauseSel = 0; delArmed = 0; }
         }
         m.push(x.p, x.hr, x.cad, x.spd, x.alt, x.dist, state.equals("rec"));
         double p3 = m.p3();
@@ -284,6 +285,8 @@ public class Dash extends View {
     public void button(String b) {
         if (learnStep >= 0) return;
         if (summary) { summary = false; goHome(); return; }
+        if (pauseMenu && (state.equals("pause") || state.equals("auto"))) { pauseButton(b); return; }
+        pauseMenu = false;
         if (mode != M_DASH) { menuButton(b); return; }
         switch (b) {
             case "next": showPage(cur + 1, 1); break;
@@ -297,7 +300,74 @@ public class Dash extends View {
                     lapFlashS = ms(p.t) + "  ·  " + Math.round(p.ap()) + " W  ·  " + f1(p.spd()) + " km/h";
                     lapFlashT = now();
                 } else if (state.equals("pause") || state.equals("auto")) {
-                    if (confirmed("finish")) {
+                    pauseMenu = true; pauseSel = 0; delArmed = 0;
+                } else goHome();
+                break;
+        }
+        invalidate();
+    }
+
+    // ---------------------------------------------------------------- menu de pause
+    static final String[] PAUSE = {"REPRENDRE", "TERMINER ET ENREGISTRER", "VOIR MES DONNÉES", "SUPPRIMER LA SORTIE"};
+    private boolean pauseMenu; private int pauseSel; private long delArmed;
+
+    private void pauseButton(String b) {
+        if (b.equals("next")) pauseSel = (pauseSel + 1) % PAUSE.length;
+        else if (b.equals("prev")) pauseSel = (pauseSel + PAUSE.length - 1) % PAUSE.length;
+        else if (b.equals("lap")) pauseMenu = false;
+        else if (b.equals("startstop")) pauseOk(pauseSel);
+        if (pauseSel != 3) delArmed = 0;
+        invalidate();
+    }
+
+    private void pauseOk(int i) {
+        switch (i) {
+            case 0: pauseMenu = false; host.startStop(); break;
+            case 1: pauseMenu = false; endRide(); break;
+            case 2: pauseMenu = false; break;
+            default:
+                if (now() - delArmed < 4000) {
+                    pauseMenu = false; delArmed = 0;
+                    host.discardRide(); m.reset(); lastZone = -1; goHome();
+                    toast("SORTIE SUPPRIMÉE", ORANGE);
+                } else delArmed = now();
+        }
+    }
+
+    private void drawPauseMenu(Canvas c, long n) {
+        pf.setColor(0xF7090E14); c.drawRect(0, 0, 480, H, pf);
+        pf.setShader(new RadialGradient(240, 140, 360, 0x33FFB02E, 0x00000000, Shader.TileMode.CLAMP));
+        c.drawRect(0, 0, 480, H, pf); pf.setShader(null);
+        text(c, "PAUSE", 240, 104, bc8, 56, AMBER, Paint.Align.CENTER, .1f);
+        text(c, hms(s.elapsed) + "   ·   " + String.format(Locale.US, "%.1f km", m.dist / 1000) + "   ·   " + i0(m.np()) + " W NP",
+                240, 140, bc6, 20, MUTE, Paint.Align.CENTER, 0);
+        String[] sub = {"START", "fichier .FIT + résumé", "rester en pause", now() - delArmed < 4000 ? "appuie encore pour confirmer" : "sans enregistrer"};
+        int[] col = {CYAN, TXT, MUTE, ORANGE};
+        float t0 = 172, rh = 86;
+        for (int i = 0; i < PAUSE.length; i++) {
+            boolean on = i == pauseSel;
+            float t = t0 + i * (rh + 10), b = t + rh;
+            boolean armed = i == 3 && now() - delArmed < 4000;
+            pf.setColor(i == 0 ? (on ? CYAN : 0xFF0F2A27) : armed ? 0xFF3A1409 : on ? 0xFF13202B : TILE);
+            rf.set(12, t, 468, b); c.drawRoundRect(rf, 16, 16, pf);
+            ps.setColor(on ? (i == 3 ? ORANGE : i == 0 ? 0xFFFFFFFF : CYAN) : LINE); ps.setStrokeWidth(on ? 2.5f : 1); c.drawRoundRect(rf, 16, 16, ps);
+            int tc = i == 0 ? (on ? BG : CYAN) : col[i];
+            text(c, PAUSE[i], 30, t + 46, bc8, i == 0 ? 34 : 26, armed ? ORANGE : tc, Paint.Align.LEFT, .04f);
+            text(c, sub[i], 30, t + 70, b6, 14, i == 0 && on ? 0xBF090E14 : MUTE, Paint.Align.LEFT, 0);
+            text(c, "›", 448, t + 56, bc8, 36, i == 0 && on ? BG : DIM, Paint.Align.RIGHT, 0);
+        }
+        footBtns(c, "‹  DONNÉES", "VALIDER  ›");
+    }
+
+    private void pauseTap(float x, float y) {
+        if (y > H - 64) { pauseButton(x < 240 ? "lap" : "startstop"); return; }
+        int i = (int) Math.floor((y - 172) / 96);
+        if (i >= 0 && i < PAUSE.length && y >= 172) { pauseSel = i; pauseOk(i); invalidate(); }
+    }
+
+    /** termine la sortie : enregistre, affiche le résumé */
+    private void endRide() {
+                    {
                         // résumé de la sortie avant remise à zéro
                         sumTime = ms(s.elapsed); sumDist = String.format(Locale.US, "%.2f", m.dist / 1000);
                         sumDplus = String.valueOf(Math.round(m.dplus)); sumNp = i0(m.np()); sumTss = i0(m.tss());
@@ -312,11 +382,7 @@ public class Dash extends View {
                         sumFile = f != null && !f.isEmpty() ? f : null;
                         summary = true;
                         m.reset(); lastZone = -1;
-                    } else confirm("finish", "TERMINER LA SORTIE ?", "TOUR : enregistrer le fichier .FIT", "START : reprendre");
-                } else goHome();
-                break;
-        }
-        invalidate();
+                    }
     }
 
     private void confirm(String kind, String t, String s1, String s2) {
@@ -358,7 +424,7 @@ public class Dash extends View {
     public void showPageNow(int i) { cur = (i + PAGES.length) % PAGES.length; prev = cur; pageT = 0; invalidate(); }
     public void skipSplash() { born = 0; }
     public void newLapQuiet() { m.newLap(); }
-    public void demoSummary() { state = "pause"; confirmKind = "finish"; confirmUntil = now() + 4000; button("lap"); }
+    public void demoSummary() { state = "pause"; endRide(); }
 
     public void toast(String t, int col) { toastTxt = t; toastCol = col; toastT = now(); invalidate(); }
 
@@ -386,6 +452,7 @@ public class Dash extends View {
                 return true;
             }
             if (summary) { summary = false; goHome(); return true; }
+            if (pauseMenu && (state.equals("pause") || state.equals("auto"))) { pauseTap(x, y); return true; }
             if (now() < confirmUntil) {
                 if (y > H - 64) button(x < 240 ? "startstop" : "lap");
                 return true;
@@ -444,6 +511,8 @@ public class Dash extends View {
 
         drawFooter(c);
         if (mode != M_DASH) drawMenus(c, n);
+        if (pauseMenu && state.equals("pause")) drawPauseMenu(c, n);
+        else if (pauseMenu && !state.equals("auto")) pauseMenu = false;
         drawOverlays(c, n);
         drawSplash(c, n);
         c.restore();
@@ -901,7 +970,7 @@ public class Dash extends View {
             ps.setColor(AMBER); ps.setStrokeWidth(2); c.drawRoundRect(rf, 14, 14, ps);
             text(c, state.equals("auto") ? "REPARS = REPRISE" : "START  reprendre", 128, y + 32, bc7, 20, AMBER, Paint.Align.CENTER, .06f);
             pf.setColor(0x66FFB02E); c.drawRect(239, y + 12, 241, y + 38, pf);
-            text(c, "TOUR  terminer", 354, y + 32, bc7, 20, TXT, Paint.Align.CENTER, .06f);
+            text(c, "TOUR  menu", 354, y + 32, bc7, 20, TXT, Paint.Align.CENTER, .06f);
         }
         if (summary) { drawSummary(c); return; }
         // toast
