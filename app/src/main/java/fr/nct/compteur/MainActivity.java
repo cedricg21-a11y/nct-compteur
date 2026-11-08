@@ -1,41 +1,36 @@
 package fr.nct.compteur;
 
 import android.Manifest;
-import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.os.Handler;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowManager;
-import android.webkit.JavascriptInterface;
-import android.webkit.WebChromeClient;
-import android.webkit.WebSettings;
-import android.webkit.WebView;
-import android.webkit.WebViewClient;
 
 import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
-public class MainActivity extends Activity implements Ride.Ui {
-    private WebView web;
+public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
+    private Dash dash;
     private Ride ride;
-    private boolean pageReady;
-    private SharedPreferences keys;
-    private boolean learning;
+    private SharedPreferences keys, cfg;
+    private boolean learning, errorScreen;
 
-    @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
                 | WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
                 | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
         keys = getSharedPreferences("keys", MODE_PRIVATE);
+        cfg = getSharedPreferences("cfg", MODE_PRIVATE);
 
-        // rapport de plantage : on l'enregistre, et on l'affiche au lancement suivant
+        // rapport de plantage : enregistré, puis affiché au lancement suivant
         final Thread.UncaughtExceptionHandler def = Thread.getDefaultUncaughtExceptionHandler();
         Thread.setDefaultUncaughtExceptionHandler((t, ex) -> {
             try {
@@ -48,65 +43,33 @@ public class MainActivity extends Activity implements Ride.Ui {
         String crash = getSharedPreferences("crash", MODE_PRIVATE).getString("last", null);
         if (crash != null) {
             getSharedPreferences("crash", MODE_PRIVATE).edit().remove("last").commit();
-            showError("L'appli a planté au dernier lancement.\nPrends une photo de cet écran et envoie-la à Claude.\nAppuie sur un bouton pour relancer.\n\n" + crash, true);
+            showError("L'appli a planté au dernier lancement.\nPrends une photo de cet écran et envoie-la à Claude.\nAppuie sur un bouton (ou touche l'écran) pour relancer.\n\n" + crash);
             return;
         }
 
-        try {
-            web = new WebView(this);
-        } catch (Throwable ex) {
-            java.io.StringWriter sw = new java.io.StringWriter();
-            ex.printStackTrace(new java.io.PrintWriter(sw));
-            showError("Impossible de créer le WebView (composant d'affichage Android).\nPrends une photo de cet écran et envoie-la à Claude.\n\n" + sw, false);
-            return;
-        }
-        setupWeb();
-    }
-
-    private boolean errorScreen, relaunchOnKey;
-
-    private void showError(String msg, boolean relaunch) {
-        errorScreen = true; relaunchOnKey = relaunch;
-        android.widget.ScrollView sv = new android.widget.ScrollView(this);
-        android.widget.TextView tv = new android.widget.TextView(this);
-        tv.setText(msg); tv.setTextColor(0xFFEEF3F7); tv.setTextSize(11); tv.setPadding(20, 30, 20, 30);
-        if (relaunch) tv.setOnClickListener(v -> recreate());
-        sv.setBackgroundColor(0xFF090E14); sv.addView(tv);
-        setContentView(sv);
-    }
-
-    @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
-    private void setupWeb() {
-        web.setBackgroundColor(0xFF090E14);
-        WebSettings s = web.getSettings();
-        s.setJavaScriptEnabled(true);
-        s.setDomStorageEnabled(true);
-        s.setUseWideViewPort(true);
-        s.setLoadWithOverviewMode(true);
-        s.setAllowFileAccess(true);
-        s.setSupportZoom(false);
-        s.setMediaPlaybackRequiresUserGesture(false);
-        web.setVerticalScrollBarEnabled(false);
-        web.setHorizontalScrollBarEnabled(false);
-        web.setFocusable(false);
-        web.setWebChromeClient(new WebChromeClient());
-        web.setWebViewClient(new WebViewClient() {
-            @Override public void onPageFinished(WebView v, String url) {
-                pageReady = true;
-                js("NCT.nativeReady(" + JSONObject.quote(keys.getString("map", "")) + ")");
-            }
-        });
-        web.addJavascriptInterface(new Bridge(), "Android");
-        setContentView(web);
-        web.loadUrl("file:///android_asset/www/index.html");
+        dash = new Dash(this, this);
+        dash.setCfg(cfg.getInt("ftp", 250), cfg.getInt("hrMax", 185), cfg.getFloat("weight", 72f));
+        setContentView(dash);
 
         ride = Ride.get(this);
         ride.attach(this);
         askPermissions();
+
+        // premier lancement : apprentissage des boutons après le splash
+        if (keys.getString("map", "").isEmpty()) new Handler().postDelayed(() -> dash.startLearn(), 3300);
+    }
+
+    private void showError(String msg) {
+        errorScreen = true;
+        android.widget.ScrollView sv = new android.widget.ScrollView(this);
+        android.widget.TextView tv = new android.widget.TextView(this);
+        tv.setText(msg); tv.setTextColor(0xFFEEF3F7); tv.setTextSize(11); tv.setPadding(20, 30, 20, 30);
+        tv.setOnClickListener(v -> recreate());
+        sv.setBackgroundColor(0xFF090E14); sv.addView(tv);
+        setContentView(sv);
     }
 
     private void askPermissions() {
-        if (ride == null) return;
         String[] perms = {Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.WRITE_EXTERNAL_STORAGE};
         List<String> need = new ArrayList<>();
         for (String p : perms) if (checkSelfPermission(p) != PackageManager.PERMISSION_GRANTED) need.add(p);
@@ -142,27 +105,31 @@ public class MainActivity extends Activity implements Ride.Ui {
 
     @Override public boolean onKeyDown(int code, KeyEvent e) {
         if (code == KeyEvent.KEYCODE_POWER) return super.onKeyDown(code, e);
-        if (errorScreen) { if (relaunchOnKey) recreate(); return code != KeyEvent.KEYCODE_BACK || super.onKeyDown(code, e); }
+        if (errorScreen) { recreate(); return true; }
         if (e.getRepeatCount() > 0) return true;
-        if (learning) { js("NCT.onKey(" + code + ")"); return true; }
+        if (learning) { dash.onKey(code); return true; }
         String action = actionFor(code);
-        if (action != null) { js("NCT.onButton('" + action + "')"); return true; }
-        // touche inconnue : on la signale (utile pour configurer)
-        if (code != KeyEvent.KEYCODE_BACK) { js("NCT.onKey(" + code + ")"); return true; }
-        return super.onKeyDown(code, e);
+        if (action != null) { dash.button(action); return true; }
+        if (code == KeyEvent.KEYCODE_BACK) return super.onKeyDown(code, e);
+        dash.onKey(code); // touche inconnue : signalée à l'écran
+        return true;
     }
 
     @Override public boolean onKeyUp(int code, KeyEvent e) {
-        if (errorScreen) return super.onKeyUp(code, e);
-        if (code == KeyEvent.KEYCODE_POWER || code == KeyEvent.KEYCODE_BACK && actionFor(code) == null && !learning)
-            return super.onKeyUp(code, e);
+        if (code == KeyEvent.KEYCODE_POWER || errorScreen) return super.onKeyUp(code, e);
+        if (code == KeyEvent.KEYCODE_BACK && !learning && actionFor(code) == null) return super.onKeyUp(code, e);
         return true;
+    }
+
+    @Override public void onBackPressed() {
+        // on ne quitte pas pendant une sortie
+        if (ride != null && !ride.state.equals("idle")) { dash.toast("SORTIE EN COURS", 0xFFFFB02E); return; }
+        super.onBackPressed();
     }
 
     private String actionFor(int code) {
         String map = keys.getString("map", "");
         if (map.isEmpty()) {
-            // valeurs par défaut en attendant l'apprentissage
             switch (code) {
                 case KeyEvent.KEYCODE_PAGE_DOWN: case KeyEvent.KEYCODE_DPAD_DOWN: case KeyEvent.KEYCODE_DPAD_RIGHT: case KeyEvent.KEYCODE_VOLUME_DOWN: return "next";
                 case KeyEvent.KEYCODE_PAGE_UP: case KeyEvent.KEYCODE_DPAD_UP: case KeyEvent.KEYCODE_DPAD_LEFT: case KeyEvent.KEYCODE_VOLUME_UP: return "prev";
@@ -176,29 +143,25 @@ public class MainActivity extends Activity implements Ride.Ui {
         } catch (Exception ex) { return null; }
     }
 
-    // ------------------------------------------------------------ pont JS
+    // ------------------------------------------------------------ Ride.Ui
 
-    private void js(final String code) {
-        if (!pageReady) return;
-        runOnUiThread(() -> web.evaluateJavascript(code, null));
+    @Override public void sample(Ride.Sample s) { if (dash != null) dash.onSample(s); }
+
+    @Override public void event(String kind, String text) {
+        if (dash != null) dash.sensorEvent(text, !text.startsWith("✕"));
     }
 
-    @Override public void sample(String json) { js("NCT.onSample(" + json + ")"); }
-    @Override public void event(String kind, String text) { js("NCT.onEvent(" + JSONObject.quote(kind) + "," + JSONObject.quote(text) + ")"); }
+    // ------------------------------------------------------------ Dash.Host
 
-    class Bridge {
-        @JavascriptInterface public void startStop() { runOnUiThread(() -> ride.startStop()); }
-        @JavascriptInterface public void lap() { runOnUiThread(() -> ride.lap()); }
-        @JavascriptInterface public String finish() {
-            final String[] r = new String[1];
-            final Object lock = new Object();
-            runOnUiThread(() -> { synchronized (lock) { r[0] = ride.finish(); lock.notify(); } });
-            synchronized (lock) { try { lock.wait(3000); } catch (InterruptedException ignored) {} }
-            return r[0] == null ? "" : r[0];
-        }
-        @JavascriptInterface public void setLearning(boolean on) { learning = on; }
-        @JavascriptInterface public void saveKeyMap(String json) { keys.edit().putString("map", json).apply(); }
-        @JavascriptInterface public void forgetSensors() { runOnUiThread(() -> ride.ble.forget()); }
-        @JavascriptInterface public void quit() { runOnUiThread(() -> { if (ride.state.equals("idle")) finishAndRemoveTask(); }); }
+    @Override public void startStop() { ride.startStop(); }
+    @Override public void lap() { ride.lap(); }
+    @Override public String finish() { return ride.finish(); }
+    @Override public void setLearning(boolean on) { learning = on; }
+    @Override public void saveKeyMap(Map<Integer, String> map) {
+        try {
+            JSONObject o = new JSONObject();
+            for (Map.Entry<Integer, String> en : map.entrySet()) o.put(String.valueOf(en.getKey()), en.getValue());
+            keys.edit().putString("map", o.toString()).apply();
+        } catch (Exception ignored) {}
     }
 }

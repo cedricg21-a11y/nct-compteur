@@ -17,7 +17,6 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
-import org.json.JSONObject;
 
 import java.io.File;
 import java.text.SimpleDateFormat;
@@ -37,8 +36,13 @@ public class Ride implements Ble.Listener, LocationListener, SensorEventListener
         return inst;
     }
 
+    public static class Sample {
+        public int p, hr, cad, bat; public double spd, dist, alt; public String state; public long elapsed;
+        public boolean sPwr, sHr, sGps, sCsc;
+    }
+
     public interface Ui {
-        void sample(String json);
+        void sample(Sample s);
         void event(String kind, String text);
     }
 
@@ -119,17 +123,11 @@ public class Ride implements Ble.Listener, LocationListener, SensorEventListener
         }
 
         if (ui == null) return;
-        try {
-            JSONObject o = new JSONObject();
-            o.put("p", p); o.put("hr", hr); o.put("cad", cad);
-            o.put("spd", spd); o.put("dist", distM);
-            if (!Double.isNaN(alt)) o.put("alt", alt);
-            o.put("state", state); o.put("elapsed", timerS); o.put("bat", battery());
-            JSONObject s = new JSONObject();
-            s.put("pwr", ble.pwrOk()); s.put("hr", ble.hrOk()); s.put("gps", gpsFix); s.put("csc", ble.cscOk());
-            o.put("sensors", s);
-            ui.sample(o.toString());
-        } catch (Exception e) { Log.e(TAG, "json", e); }
+        Sample s = new Sample();
+        s.p = p; s.hr = hr; s.cad = cad; s.spd = spd; s.dist = distM; s.alt = alt;
+        s.state = state; s.elapsed = timerS; s.bat = battery();
+        s.sPwr = ble.pwrOk(); s.sHr = ble.hrOk(); s.sGps = gpsFix; s.sCsc = ble.cscOk();
+        ui.sample(s);
     }
 
     double speedKmh() {

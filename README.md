@@ -12,4 +12,4 @@ https://github.com/cedricg21-a11y/nct-compteur/releases/latest/download/nct-comp
 
 Boutons : START = démarrer/pause · TOUR = nouveau tour (en pause : terminer et enregistrer ; à l'arrêt : reconfigurer les boutons).
 
-L'interface est dans `app/src/main/assets/www/` (aperçu navigateur : `index.html?demo=1`).
+Maquettes HTML de référence dans `design/` (aperçu navigateur : `index.html?demo=1`). L’interface de l’appli est dessinée en natif (`Dash.java`) car la ROM Xcadey n’a pas de WebView.
