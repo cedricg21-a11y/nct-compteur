@@ -42,6 +42,7 @@ public class Dash extends View {
         void openAndroidSettings();
         boolean mapReady();
         float[] mapPos();
+        float[] wind();
         void mapExplore(boolean on);
         java.util.List<org.json.JSONObject> rides();
         void saveRide(org.json.JSONObject r);
@@ -458,6 +459,7 @@ public class Dash extends View {
             float px = 240, py = H / 2f;
             float[] mp = host.mapPos();
             if (mp != null) { px = mp[0] / sc; py = mp[1] / sc; }
+            drawWindRing(c, px, py);
             c.save(); c.translate(px, py); c.rotate(s.bearing);
             pf.setColor(0x5500E5C8); c.drawCircle(0, 0, 24, pf);
             path.reset(); path.moveTo(0, -17); path.lineTo(12, 13); path.lineTo(0, 6); path.lineTo(-12, 13); path.close();
@@ -477,12 +479,7 @@ public class Dash extends View {
                 // icône main / exploration
                 ps.setColor(TXT); ps.setStrokeWidth(2.5f); c.drawCircle(441, top + 149, 9, ps); c.drawLine(448, top + 156, 456, top + 164, ps);
             }
-            // nord
-            pf.setColor(0xCC090E14); c.drawCircle(36, top + 40, 22, pf);
-            ps.setColor(LINE); ps.setStrokeWidth(1); c.drawCircle(36, top + 40, 22, ps);
-            path.reset(); path.moveTo(36, top + 24); path.lineTo(43, top + 42); path.lineTo(29, top + 42); path.close();
-            pf.setColor(ORANGE); c.drawPath(path, pf);
-            text(c, "N", 36, top + 56, bc7, 13, TXT, Paint.Align.CENTER, 0);
+            drawWind(c, top, px, py);
         }
         // bandeau de données
         float t = mb + 6, w = (456 - 20) / 3f;
@@ -495,6 +492,70 @@ public class Dash extends View {
             valUnit(c, l + 14, bottom - 26, val[i], 54, un[i]);
         }
         if (s.sPwr) { pf.setColor(zoneCol); rf.set(26, bottom - 18, 12 + w - 14, bottom - 14); c.drawRoundRect(rf, 2, 2, pf); }
+    }
+
+    /** angle relatif du vent (d'où il vient) par rapport à la direction de marche, -180..180 */
+    private float windRel(float from) { float r = (from - s.bearing) % 360; if (r > 180) r -= 360; if (r < -180) r += 360; return r; }
+
+    private void drawWindRing(Canvas c, float px, float py) {
+        float[] w = host.wind();
+        if (w == null) return;
+        float R = 46;
+        ps.setColor(0x99090E14); ps.setStrokeWidth(7); c.drawCircle(px, py, R, ps);
+        ps.setColor(0x55FFFFFF); ps.setStrokeWidth(1.5f); c.drawCircle(px, py, R, ps);
+        // carte nord en haut : le point est placé à la direction d'où vient le vent
+        double a = Math.toRadians(w[0]);
+        float dx = (float) Math.sin(a), dy = (float) -Math.cos(a);
+        float x = px + R * dx, y = py + R * dy;
+        // petite flèche vers le cycliste (sens du vent)
+        path.reset();
+        float ix = px + (R - 20) * dx, iy = py + (R - 20) * dy, nx = -dy, ny = dx;
+        path.moveTo(ix, iy); path.lineTo(x - 10 * dx + 6 * nx, y - 10 * dy + 6 * ny); path.lineTo(x - 10 * dx - 6 * nx, y - 10 * dy - 6 * ny); path.close();
+        pf.setColor(0xCCE85022); c.drawPath(path, pf);
+        pf.setColor(0x66E85022); c.drawCircle(x, y, 19, pf);
+        pf.setColor(ORANGE); c.drawCircle(x, y, 15, pf);
+        ps.setColor(0xFFFFFFFF); ps.setStrokeWidth(2.5f); c.drawCircle(x, y, 15, ps);
+        text(c, String.valueOf(Math.round(w[1])), x, y + 6, bc8, 17, 0xFFFFFFFF, Paint.Align.CENTER, 0);
+    }
+
+    private static final String[] DIR16 = {"N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSO", "SO", "OSO", "O", "ONO", "NO", "NNO"};
+
+    private void drawWind(Canvas c, float top, float px, float py) {
+        float[] w = host.wind();
+        float l = 12, t = top + 12, r = 196, b = t + 74;
+        pf.setColor(0xEB090E14); rf.set(l, t, r, b); c.drawRoundRect(rf, 14, 14, pf);
+        ps.setColor(LINE); ps.setStrokeWidth(1); c.drawRoundRect(rf, 14, 14, ps);
+        // mini-boussole nord
+        float cx = l + 32, cy = t + 37;
+        ps.setColor(0xFF2A3644); ps.setStrokeWidth(2); c.drawCircle(cx, cy, 20, ps);
+        path.reset(); path.moveTo(cx, cy - 19); path.lineTo(cx + 5, cy - 9); path.lineTo(cx - 5, cy - 9); path.close();
+        pf.setColor(MUTE); c.drawPath(path, pf);
+        text(c, "N", cx, cy - 22, bc7, 10, MUTE, Paint.Align.CENTER, 0);
+        if (w == null) {
+            text(c, "VENT", l + 64, t + 32, b7, 12, MUTE, Paint.Align.LEFT, .14f);
+            text(c, "pas de prévision", l + 64, t + 54, b6, 13, DIM, Paint.Align.LEFT, 0);
+            return;
+        }
+        // flèche du vent dans la boussole (sens du vent, vers où il souffle)
+        double a = Math.toRadians(w[0]);
+        float dx = (float) Math.sin(a), dy = (float) -Math.cos(a);
+        ps.setColor(ORANGE); ps.setStrokeWidth(4); ps.setStrokeCap(Paint.Cap.ROUND);
+        c.drawLine(cx + 16 * dx, cy + 16 * dy, cx - 8 * dx, cy - 8 * dy, ps);
+        ps.setStrokeCap(Paint.Cap.BUTT);
+        path.reset(); float nx = -dy, ny = dx, tx = cx - 15 * dx, ty = cy - 15 * dy;
+        path.moveTo(tx, ty); path.lineTo(cx - 6 * dx + 6 * nx, cy - 6 * dy + 6 * ny); path.lineTo(cx - 6 * dx - 6 * nx, cy - 6 * dy - 6 * ny); path.close();
+        pf.setColor(ORANGE); c.drawPath(path, pf);
+        // force du vent
+        String v = String.valueOf(Math.round(w[1]));
+        text(c, v, l + 64, t + 46, bc8, 36, TXT, Paint.Align.LEFT, 0);
+        pt.setTypeface(bc8); pt.setTextSize(36); pt.setLetterSpacing(0);
+        float vw = pt.measureText(v);
+        text(c, "km/h", l + 68 + vw, t + 30, bc6, 13, MUTE, Paint.Align.LEFT, 0);
+        text(c, DIR16[(int) Math.round(w[0] / 22.5) % 16], l + 68 + vw, t + 46, bc7, 14, TXT, Paint.Align.LEFT, 0);
+        float rel = Math.abs(windRel(w[0]));
+        String lab = rel <= 45 ? "DE FACE" : rel <= 135 ? "DE CÔTÉ" : "DANS LE DOS";
+        int col = rel <= 45 ? ORANGE : rel <= 135 ? AMBER : CYAN;
+        text(c, lab + "  ·  raf. " + Math.round(w[2]), l + 64, t + 64, b7, 11, col, Paint.Align.LEFT, .08f);
     }
 
     private void zoomBtn(Canvas c, float x, float y, String l) {

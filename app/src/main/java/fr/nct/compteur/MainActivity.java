@@ -19,6 +19,7 @@ import java.util.Map;
 public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
     private Dash dash;
     private MapHolder map;
+    private Wind wind;
     private Ride ride;
     private SharedPreferences keys, cfg;
     private boolean learning, errorScreen;
@@ -49,6 +50,7 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
         }
 
         applyBrightness();
+        wind = new Wind(this);
         dash = new Dash(this, this);
         dash.setCfg(cfg.getInt("ftp", 250), cfg.getInt("hrMax", 185), cfg.getFloat("weight", 72f));
         android.widget.FrameLayout root = new android.widget.FrameLayout(this);
@@ -192,6 +194,7 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
     @Override public void sample(Ride.Sample s) {
         if (dash != null) dash.onSample(s);
         if (map != null) map.update(s);
+        if (wind != null && sim == null) wind.maybeRefresh(Double.isNaN(s.lat) ? 49.096 : s.lat, Double.isNaN(s.lon) ? 0.416 : s.lon);
     }
 
     @Override public void event(String kind, String text) {
@@ -250,6 +253,11 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
     @Override public void setAutoPause(boolean on) {
         if (sim != null) { simAuto = on; return; }
         ride.autoPause = on; cfg.edit().putBoolean("autopause", on).apply();
+    }
+
+    @Override public float[] wind() {
+        if (sim != null) return new float[]{315, 22, 31, 8};
+        return wind == null ? null : wind.now();
     }
 
     @Override public float[] mapPos() { return map == null ? null : map.positionPx(); }
