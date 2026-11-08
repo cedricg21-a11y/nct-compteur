@@ -15,12 +15,12 @@ public class RideService extends Service {
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        NotificationChannel ch = new NotificationChannel("ride", "Sortie en cours", NotificationManager.IMPORTANCE_LOW);
+        NotificationChannel ch = new NotificationChannel("ride", "NCT Compteur actif", NotificationManager.IMPORTANCE_LOW);
         nm.createNotificationChannel(ch);
         PendingIntent pi = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class), PendingIntent.FLAG_IMMUTABLE);
         Notification n = new Notification.Builder(this, "ride")
                 .setContentTitle("NCT Compteur")
-                .setContentText("Sortie en cours d'enregistrement")
+                .setContentText("Actif : capteurs et GPS connectés")
                 .setSmallIcon(android.R.drawable.ic_media_play)
                 .setContentIntent(pi)
                 .setOngoing(true)

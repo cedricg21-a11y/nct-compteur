@@ -66,6 +66,8 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
         ride.autoPause = cfg.getBoolean("autopause", true);
         if (getIntent().getStringExtra("demo") != null) { startDemo(); return; }
         ride.attach(this);
+        // service de premier plan : capteurs et GPS restent actifs écran éteint
+        try { startService(new android.content.Intent(this, RideService.class)); } catch (Exception ignored) {}
         askPermissions();
 
         // premier lancement : apprentissage des boutons après le splash
@@ -332,6 +334,7 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
 
     @Override public void quitApp() {
         if (ride != null) ride.ble.stop();
+        try { stopService(new android.content.Intent(this, RideService.class)); } catch (Exception ignored) {}
         finishAndRemoveTask();
         android.os.Process.killProcess(android.os.Process.myPid());
     }

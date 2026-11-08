@@ -271,7 +271,6 @@ public class Ride implements Ble.Listener, LocationListener, SensorEventListener
             fit = null;
         }
         state = "idle"; timerS = 0; distM = 0;
-        ctx.stopService(new Intent(ctx, RideService.class));
         step(now);
         return name;
     }
@@ -279,7 +278,6 @@ public class Ride implements Ble.Listener, LocationListener, SensorEventListener
     public void discard() {
         if (fit != null) { fit.abort(); fit = null; }
         state = "idle"; timerS = 0; distM = 0;
-        ctx.stopService(new Intent(ctx, RideService.class));
     }
 
     // ------------------------------------------------------------ callbacks

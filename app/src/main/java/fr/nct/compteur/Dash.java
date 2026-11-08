@@ -236,8 +236,13 @@ public class Dash extends View {
         if (!state.equals(was) && !quiet) {
             if (state.equals("rec")) toast(was.equals("pause") || was.equals("auto") ? "REPRISE" : "C'EST PARTI !", CYAN);
             else if (state.equals("auto")) toast("PAUSE AUTO", AMBER);
+            if (state.equals("auto")) autoSince = now();
+            if (was.equals("auto") && state.equals("rec") && pauseMenu) pauseMenu = false; // reparti : on referme
             else if (state.equals("pause")) { pauseMenu = true; pauseSel = 0; delArmed = 0; }
         }
+        // arrêt prolongé en pause auto (> 1 min) : le menu de pause s'ouvre tout seul
+        if (state.equals("auto") && !pauseMenu && !autoMenuShown && now() - autoSince > 60000) { pauseMenu = true; pauseSel = 0; autoMenuShown = true; }
+        if (!state.equals("auto")) autoMenuShown = false;
         m.push(x.p, x.hr, x.cad, x.spd, x.alt, x.dist, state.equals("rec"));
         double p3 = m.p3();
         set("pwr", p3); set("wkg", p3 / m.weight); set("pftp", 100 * p3 / m.ftp);
@@ -310,7 +315,7 @@ public class Dash extends View {
 
     // ---------------------------------------------------------------- menu de pause
     static final String[] PAUSE = {"REPRENDRE", "TERMINER ET ENREGISTRER", "VOIR MES DONNÉES", "SUPPRIMER LA SORTIE"};
-    private boolean pauseMenu; private int pauseSel; private long delArmed;
+    private boolean pauseMenu, autoMenuShown; private int pauseSel; private long delArmed, autoSince;
 
     private void pauseButton(String b) {
         if (b.equals("next")) pauseSel = (pauseSel + 1) % PAUSE.length;
@@ -323,7 +328,7 @@ public class Dash extends View {
 
     private void pauseOk(int i) {
         switch (i) {
-            case 0: pauseMenu = false; host.startStop(); break;
+            case 0: pauseMenu = false; if (!state.equals("auto")) host.startStop(); break;
             case 1: pauseMenu = false; endRide(); break;
             case 2: pauseMenu = false; break;
             default:
@@ -339,7 +344,8 @@ public class Dash extends View {
         pf.setColor(0xF7090E14); c.drawRect(0, 0, 480, H, pf);
         pf.setShader(new RadialGradient(240, 140, 360, 0x33FFB02E, 0x00000000, Shader.TileMode.CLAMP));
         c.drawRect(0, 0, 480, H, pf); pf.setShader(null);
-        text(c, "PAUSE", 240, 104, bc8, 56, AMBER, Paint.Align.CENTER, .1f);
+        text(c, state.equals("auto") ? "ARRÊT" : "PAUSE", 240, 104, bc8, 56, AMBER, Paint.Align.CENTER, .1f);
+        if (state.equals("auto")) text(c, "pause automatique — repars pour reprendre", 240, 160, b6, 14, DIM, Paint.Align.CENTER, 0);
         text(c, hms(s.elapsed) + "   ·   " + String.format(Locale.US, "%.1f km", m.dist / 1000) + "   ·   " + i0(m.np()) + " W NP",
                 240, 140, bc6, 20, MUTE, Paint.Align.CENTER, 0);
         String[] sub = {"START", "fichier .FIT + résumé", "rester en pause", now() - delArmed < 4000 ? "appuie encore pour confirmer" : "sans enregistrer"};
@@ -512,8 +518,8 @@ public class Dash extends View {
 
         drawFooter(c);
         if (mode != M_DASH) drawMenus(c, n);
-        if (pauseMenu && state.equals("pause")) drawPauseMenu(c, n);
-        else if (pauseMenu && !state.equals("auto")) pauseMenu = false;
+        if (pauseMenu && (state.equals("pause") || state.equals("auto"))) drawPauseMenu(c, n);
+        else if (pauseMenu) pauseMenu = false;
         drawOverlays(c, n);
         drawSplash(c, n);
         c.restore();
