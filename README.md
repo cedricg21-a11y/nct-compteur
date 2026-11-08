@@ -1,0 +1,15 @@
+# NCT Compteur
+
+Appli compteur vélo aux couleurs de NCT pour le Xcadey Alpha 800 (Android 8.1).
+
+**Installer la dernière version depuis le compteur (Chrome) :**
+https://github.com/cedricg21-a11y/nct-compteur/releases/latest/download/nct-compteur.apk
+
+- Capteurs Bluetooth : puissance, cardio, vitesse/cadence (connexion automatique)
+- GPS + baromètre, enregistrement `.FIT` dans `/sdcard/NCT/`
+- 4 pages : LIVE, EFFORT (W'bal « Réservoir »), GRIMPÉE, TOUR
+- 4 boutons physiques configurables au premier lancement
+
+Boutons : START = démarrer/pause · TOUR = nouveau tour (en pause : terminer et enregistrer ; à l'arrêt : reconfigurer les boutons).
+
+L'interface est dans `app/src/main/assets/www/` (aperçu navigateur : `index.html?demo=1`).

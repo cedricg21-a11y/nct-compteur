@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=480, user-scalable=no">
+<title>NCT Compteur</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app" class="booting">
+  <div id="glow"></div>
+
+  <!-- ===== HEADER ===== -->
+  <header id="hdr">
+    <div class="logo"><img src="logo-nct.png" alt="NCT"><i></i></div>
+    <div class="ptitle"><div id="pageName">LIVE</div><div id="dots"></div></div>
+    <div class="status">
+      <svg id="icPwr" class="ic" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>
+      <svg id="icHr" class="ic" viewBox="0 0 24 24"><path d="M12 21s-8-5.2-8-11.2C4 6.6 6.4 4.5 9 4.5c1.4 0 2.4.6 3 1.6.6-1 1.6-1.6 3-1.6 2.6 0 5 2.1 5 5.3C20 15.8 12 21 12 21z"/></svg>
+      <svg id="icGps" class="ic" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>
+      <div id="batt"><b></b><span>--</span></div>
+    </div>
+  </header>
+
+  <!-- ===== PAGES ===== -->
+  <main id="pages">
+    <!-- LIVE -->
+    <section class="page" data-name="LIVE">
+      <div class="gauge">
+        <svg viewBox="0 0 480 330" width="480" height="330">
+          <defs>
+            <linearGradient id="gArc" x1="60" y1="0" x2="420" y2="0" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#00e5c8"/>
+              <stop offset=".55" stop-color="#9be36a"/>
+              <stop offset=".75" stop-color="#ffb02e"/>
+              <stop offset="1" stop-color="#e85022"/>
+            </linearGradient>
+          </defs>
+          <g id="zoneTicks"></g>
+          <path id="arcTrack" class="arc-track"/>
+          <path id="arcGlow" class="arc-glow"/>
+          <path id="arcVal" class="arc-val"/>
+          <circle id="arcHead" r="9" class="arc-head"/>
+        </svg>
+        <div class="gcenter">
+          <div class="big" id="vPower">0</div>
+          <div class="unit">WATTS <em>3S</em></div>
+          <div class="zchip" id="vZone">Z1 · RÉCUP</div>
+        </div>
+        <div class="gside l"><b id="vWkg">0.0</b><span>W/KG</span></div>
+        <div class="gside r"><b id="vPftp">0</b><span>% FTP</span></div>
+      </div>
+      <div class="tiles g2">
+        <div class="tile hr">
+          <label><svg viewBox="0 0 24 24"><path d="M12 21s-8-5.2-8-11.2C4 6.6 6.4 4.5 9 4.5c1.4 0 2.4.6 3 1.6.6-1 1.6-1.6 3-1.6 2.6 0 5 2.1 5 5.3C20 15.8 12 21 12 21z"/></svg>FRÉQ. CARDIAQUE</label>
+          <div class="val"><b id="vHr">--</b><span>BPM</span></div>
+          <div class="segbar" id="hrBar"><i></i><i></i><i></i><i></i><i></i></div>
+        </div>
+        <div class="tile">
+          <label><svg viewBox="0 0 24 24"><path d="M12 4a8 8 0 1 0 8 8h-2a6 6 0 1 1-6-6V4zm0 4 4 4-4 4V8z"/></svg>CADENCE</label>
+          <div class="val"><b id="vCad">--</b><span>RPM</span></div>
+          <div class="sub" id="vCadAvg">moy --</div>
+        </div>
+        <div class="tile">
+          <label><svg viewBox="0 0 24 24"><path d="M12 5a9 9 0 0 0-9 9h2a7 7 0 0 1 14 0h2a9 9 0 0 0-9-9zm4.2 4.4-5 3.6a1.6 1.6 0 1 0 1.9 2.4l3.1-6z"/></svg>VITESSE</label>
+          <div class="val"><b id="vSpd">0.0</b><span>KM/H</span></div>
+          <div class="sub" id="vSpdAvg">moy 0.0</div>
+        </div>
+        <div class="tile">
+          <label><svg viewBox="0 0 24 24"><path d="M4 18 10 6l4 7 2-3 4 8z"/></svg>DISTANCE</label>
+          <div class="val"><b id="vDist">0.00</b><span>KM</span></div>
+          <div class="sub" id="vDplus">D+ 0 m</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- EFFORT -->
+    <section class="page" data-name="EFFORT">
+      <div class="tiles g3 trio">
+        <div class="tile c"><label>NP</label><div class="val"><b id="vNp">0</b></div><div class="sub">WATTS</div></div>
+        <div class="tile c"><label>IF</label><div class="val"><b id="vIf">0.00</b></div><div class="sub">INTENSITÉ</div></div>
+        <div class="tile c"><label>TSS</label><div class="val"><b id="vTss">0</b></div><div class="sub">CHARGE</div></div>
+      </div>
+      <div class="tile wbal">
+        <label>RÉSERVOIR <em>W'BAL</em><span class="tag">EXCLU NCT</span></label>
+        <div class="wrow"><b id="vWbal">100</b><span>%</span><div class="wkj" id="vWbalKj">20.0 / 20.0 kJ</div></div>
+        <div class="wbar" id="wbar"></div>
+        <div class="wmsg" id="vWmsg">Réservoir plein — tu peux attaquer.</div>
+      </div>
+      <div class="tile zones">
+        <label>TEMPS DANS LES ZONES</label>
+        <div id="zoneBars"></div>
+      </div>
+    </section>
+
+    <!-- GRIMPÉE -->
+    <section class="page" data-name="GRIMPÉE">
+      <div class="climb">
+        <div class="grade" id="gradeBox"><b id="vGrade">0.0</b><span>%</span><div class="glabel">PENTE</div></div>
+        <div class="climb-side">
+          <div class="cs"><label>VAM</label><b id="vVam">0</b><span>m/h</span></div>
+          <div class="cs"><label>ALTITUDE</label><b id="vAlt">0</b><span>m</span></div>
+        </div>
+      </div>
+      <div class="tile profile">
+        <label>PROFIL <em>5 DERNIERS KM</em></label>
+        <svg id="profSvg" viewBox="0 0 440 200" width="440" height="200" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="gProf" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#00e5c8" stop-opacity=".55"/>
+              <stop offset="1" stop-color="#00e5c8" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <path id="profFill" fill="url(#gProf)"/>
+          <path id="profLine" class="prof-line"/>
+          <circle id="profDot" r="7" class="prof-dot"/>
+        </svg>
+      </div>
+      <div class="tiles g2 short">
+        <div class="tile"><label>D+ TOTAL</label><div class="val"><b id="vDplus2">0</b><span>M</span></div></div>
+        <div class="tile"><label>PUISSANCE 30S</label><div class="val"><b id="vP30">0</b><span>W</span></div></div>
+      </div>
+    </section>
+
+    <!-- TOUR -->
+    <section class="page" data-name="TOUR">
+      <div class="lap-head">
+        <div class="lapn">TOUR <b id="vLapN">1</b></div>
+        <div class="laptime" id="vLapTime">0:00</div>
+        <div class="lapdist" id="vLapDist">0.00 km</div>
+      </div>
+      <div class="tiles g2 lap">
+        <div class="tile"><label>PUISS. MOY</label><div class="val"><b id="vLapP">0</b><span>W</span></div><div class="delta" id="dLapP"></div></div>
+        <div class="tile"><label>NP TOUR</label><div class="val"><b id="vLapNp">0</b><span>W</span></div><div class="delta" id="dLapNp"></div></div>
+        <div class="tile"><label>FC MOY</label><div class="val"><b id="vLapHr">--</b><span>BPM</span></div><div class="delta" id="dLapHr"></div></div>
+        <div class="tile"><label>VITESSE MOY</label><div class="val"><b id="vLapS">0.0</b><span>KM/H</span></div><div class="delta" id="dLapS"></div></div>
+        <div class="tile"><label>CADENCE MOY</label><div class="val"><b id="vLapC">--</b><span>RPM</span></div><div class="delta" id="dLapC"></div></div>
+        <div class="tile"><label>W/KG TOUR</label><div class="val"><b id="vLapWkg">0.0</b></div><div class="delta" id="dLapWkg"></div></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===== FOOTER ===== -->
+  <footer id="ftr">
+    <div id="recPill" class="pill idle"><i></i><span>PRÊT</span></div>
+    <div class="elapsed"><b id="vTime">0:00:00</b></div>
+    <div class="clock" id="vClock">--:--</div>
+  </footer>
+
+  <!-- ===== OVERLAYS ===== -->
+  <div id="toast"></div>
+  <div id="learn"><div class="ln-k">CONFIGURATION DES BOUTONS</div><div class="ln-step" id="lnStep">1 / 4</div><div class="ln-t" id="lnT">Appuie sur le bouton<br><b>PAGE SUIVANTE</b></div><div class="ln-s" id="lnS"></div></div>
+  <div id="confirm"><div class="cf-t" id="cfT">TERMINER LA SORTIE ?</div><div class="cf-s" id="cfS">Appuie encore sur TOUR pour enregistrer</div></div>
+  <div id="lapFlash"><div class="lf-t">TOUR <b id="lfN">2</b></div><div class="lf-s" id="lfS"></div></div>
+
+  <div id="splash">
+    <div class="sp-logo"><img src="logo.png" alt="NCT"><i class="shine"></i></div>
+    <i class="sp-sweep"></i>
+    <div class="sp-base">Ce que la fiche technique ne dit pas</div>
+  </div>
+</div>
+<script src="metrics.js"></script>
+<script src="app.js"></script>
+<script src="sim.js"></script>
+</body>
+</html>

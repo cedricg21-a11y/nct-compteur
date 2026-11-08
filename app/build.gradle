@@ -1,0 +1,35 @@
+plugins { id 'com.android.application' }
+
+def vCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInteger()
+
+android {
+    namespace 'fr.nct.compteur'
+    compileSdk 34
+    defaultConfig {
+        applicationId 'fr.nct.compteur'
+        minSdk 26
+        targetSdk 28
+        versionCode vCode
+        versionName "0.1." + vCode
+    }
+    signingConfigs {
+        nct {
+            storeFile file('nct-debug.jks')
+            storePassword 'nctcompteur'
+            keyAlias 'nct'
+            keyPassword 'nctcompteur'
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.nct
+        }
+        debug { signingConfig signingConfigs.nct }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    lint { abortOnError false; checkReleaseBuilds false }
+}
