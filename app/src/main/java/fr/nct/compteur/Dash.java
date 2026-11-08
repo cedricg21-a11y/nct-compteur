@@ -30,6 +30,9 @@ public class Dash extends View {
         void startStop();
         void bell();
         void radarBeep();
+        void radarClear();
+        boolean radarSound();
+        void setRadarSound(boolean on);
         String radarDebug();
         int bellVolume();
         void setBellVolume(int pct);
@@ -45,6 +48,7 @@ public class Dash extends View {
         void toggleSensor(Ble.Found f);
         void setKeepScanning(boolean on);
         void saveCfg(int ftp, int hrMax, double weight);
+        void saveCda(double cda);
         boolean autoPause();
         void setAutoPause(boolean on);
         void openAndroidSettings();
@@ -70,7 +74,14 @@ public class Dash extends View {
     private int backMode = M_DASH, homeSel = 0, histSel = 0;
     private boolean mapExplore;
     private java.util.List<org.json.JSONObject> rides = new java.util.ArrayList<>();
-    static final String[] MENU = {"CAPTEURS", "PROFIL", "LUMINOSITÉ", "BOUTONS", "WI-FI", "BLUETOOTH", "PARAMÈTRES ANDROID", "QUITTER", "BOUTON MARCHE", "SONNETTE"};
+    static final String[] MENU = {"CAPTEURS", "PROFIL", "SORTIE", "ÉCRAN ET SONS", "CONNEXIONS", "BOUTONS", "QUITTER"};
+    static final String[][] SUB = {
+            {"PAUSE AUTOMATIQUE"},
+            {"LUMINOSITÉ", "BOUTON MARCHE", "SONNETTE", "ALERTES RADAR"},
+            {"WI-FI", "BLUETOOTH", "PARAMÈTRES ANDROID"}};
+    static final String[] SUBT = {"SORTIE", "ÉCRAN ET SONS", "CONNEXIONS"};
+    static final int M_SUB = 6;
+    private int subId = 0, menuSel = 0;
     static final int[] BELL = {100, 75, 50, 25, 0};
     static final int[] BRIGHT = {-1, 5, 15, 30, 50, 75, 100};
     private int mode = M_HOME, sel = 0, profSel = 0;
@@ -89,6 +100,12 @@ public class Dash extends View {
             else if (b.equals("prev")) sel = (sel + MENU.length - 1) % MENU.length;
             else if (b.equals("lap")) mode = backMode;
             else if (b.equals("startstop")) menuOk(sel);
+        } else if (mode == M_SUB) {
+            int n = SUB[subId].length;
+            if (b.equals("next")) sel = (sel + 1) % n;
+            else if (b.equals("prev")) sel = (sel + n - 1) % n;
+            else if (b.equals("lap")) { mode = M_MENU; sel = menuSel; }
+            else if (b.equals("startstop")) subOk(subId, sel);
         } else if (mode == M_HOME) {
             if (b.equals("next")) homeSel = (homeSel + 1) % HOME.length;
             else if (b.equals("prev")) homeSel = (homeSel + HOME.length - 1) % HOME.length;
@@ -109,12 +126,12 @@ public class Dash extends View {
             if (profEdit) {
                 if (b.equals("next")) adjust(+1);
                 else if (b.equals("prev")) adjust(-1);
-                else { profEdit = false; host.saveCfg(m.ftp, m.hrMax, m.weight); }
+                else { profEdit = false; host.saveCfg(m.ftp, m.hrMax, m.weight); host.saveCda(m.cda); }
             } else {
                 if (b.equals("next")) profSel = (profSel + 1) % 4;
                 else if (b.equals("prev")) profSel = (profSel + 3) % 4;
-                else if (b.equals("startstop")) { if (profSel == 3) host.setAutoPause(!host.autoPause()); else profEdit = true; }
-                else if (b.equals("lap")) { host.saveCfg(m.ftp, m.hrMax, m.weight); mode = M_MENU; sel = 1; }
+                else if (b.equals("startstop")) profEdit = true;
+                else if (b.equals("lap")) { host.saveCfg(m.ftp, m.hrMax, m.weight); host.saveCda(m.cda); mode = M_MENU; sel = 1; }
             }
         }
         invalidate();
@@ -135,34 +152,56 @@ public class Dash extends View {
     private void adjust(int d) {
         if (profSel == 0) m.ftp = Math.max(80, Math.min(600, m.ftp + 5 * d));
         else if (profSel == 1) m.hrMax = Math.max(120, Math.min(230, m.hrMax + d));
-        else m.weight = Math.max(35, Math.min(150, Math.round((m.weight + .5 * d) * 2) / 2.0));
+        else if (profSel == 2) m.weight = Math.max(35, Math.min(150, Math.round((m.weight + .5 * d) * 2) / 2.0));
+        else m.cda = Math.max(0.18, Math.min(0.50, Math.round((m.cda + .01 * d) * 100) / 100.0));
     }
 
     private void menuOk(int i) {
+        menuSel = i;
         switch (i) {
             case 0: openMode(M_SENS); break;
             case 1: mode = M_PROF; profSel = 0; profEdit = false; break;
-            case 2: { // luminosité : cycle des niveaux
+            case 2: mode = M_SUB; subId = 0; sel = 0; break;
+            case 3: mode = M_SUB; subId = 1; sel = 0; break;
+            case 4: mode = M_SUB; subId = 2; sel = 0; break;
+            case 5: mode = M_DASH; startLearn(); break;
+            case 6: if (state.equals("idle")) host.quitApp(); else toast("SORTIE EN COURS", AMBER); break;
+            default: mode = backMode;
+        }
+    }
+
+    private void subOk(int id, int i) {
+        if (id == 0) {
+            host.setAutoPause(!host.autoPause());
+        } else if (id == 1) {
+            if (i == 0) {
                 int curB = host.brightness(), k = 0;
                 for (int j = 0; j < BRIGHT.length; j++) if (BRIGHT[j] == curB) k = j;
                 host.setBrightness(BRIGHT[(k + 1) % BRIGHT.length]);
-                break;
-            }
-            case 3: mode = M_DASH; startLearn(); break;
-            case 4: host.openSettings(android.provider.Settings.ACTION_WIFI_SETTINGS); break;
-            case 5: host.openSettings(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS); break;
-            case 6: host.openAndroidSettings(); break;
-            case 7: if (state.equals("idle")) host.quitApp(); else toast("SORTIE EN COURS", AMBER); break;
-            case 8: host.setBlockSleep(!host.blockSleep()); break;
-            case 9: {
+            } else if (i == 1) host.setBlockSleep(!host.blockSleep());
+            else if (i == 2) {
                 int cb = host.bellVolume(), k = 0;
                 for (int j = 0; j < BELL.length; j++) if (BELL[j] == cb) k = j;
                 host.setBellVolume(BELL[(k + 1) % BELL.length]);
                 if (host.bellVolume() > 0) host.bell();
-                break;
-            }
-            default: mode = backMode;
+            } else { host.setRadarSound(!host.radarSound()); if (host.radarSound()) host.radarBeep(); }
+        } else {
+            if (i == 0) host.openSettings(android.provider.Settings.ACTION_WIFI_SETTINGS);
+            else if (i == 1) host.openSettings(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS);
+            else host.openAndroidSettings();
         }
+    }
+
+    /** valeur affichée à droite d'une ligne de sous-menu */
+    private String subChip(int id, int i) {
+        if (id == 0) return host.autoPause() ? "ACTIVÉE" : "DÉSACTIVÉE";
+        if (id == 1) {
+            if (i == 0) { int b = host.brightness(); return b < 0 ? "AUTO" : b + " %"; }
+            if (i == 1) return host.blockSleep() ? "VEILLE BLOQUÉE" : "VEILLE ACTIVE";
+            if (i == 2) return host.bellVolume() > 0 ? host.bellVolume() + " %" : "COUPÉE";
+            return host.radarSound() ? "SON ACTIVÉ" : "SON COUPÉ";
+        }
+        return "›";
     }
 
     // couleurs
@@ -594,7 +633,7 @@ public class Dash extends View {
         double v = s.spd / 3.6;
         if (w == null || v < 1.5) return Double.NaN;
         double head = w[1] / 3.6 * 0.7 * Math.cos(Math.toRadians(windRel(w[0]))); // vent à hauteur de cycliste ≈ 70 % du vent à 10 m
-        double cda = 0.32, rho = 1.2, va = v + head;
+        double cda = m.cda, rho = 1.2, va = v + head;
         return 0.5 * rho * cda * v * (va * Math.abs(va) - v * v);
     }
 
@@ -760,8 +799,13 @@ public class Dash extends View {
         text(c, lbl, 432 - w / 2, b - 17, bc8, 22, BG, Paint.Align.CENTER, .04f);
     }
 
-    /** à chaque échantillon : bip quand un nouveau véhicule apparaît */
+    private int radarLastCnt = 0;
+
+    /** à chaque échantillon : bip quand un nouveau véhicule apparaît, son « route libre » à la fin de la détection */
     private void radarCheck() {
+        int cnt = s.sRadar ? s.rDist.length : 0;
+        if (cnt == 0 && radarLastCnt > 0 && !quiet) host.radarClear();
+        radarLastCnt = cnt;
         boolean fresh = false;
         java.util.HashSet<Integer> now = new java.util.HashSet<>();
         for (int id : s.rId) { now.add(id); if (!radarSeen.contains(id)) fresh = true; }
@@ -1419,10 +1463,14 @@ public class Dash extends View {
         if (mode == M_MENU) {
             panelHeader(c, "MENU", "VALIDER  ›");
             text(c, "NCT Compteur v" + version, 240, H - 72, b6, 12, DIM, Paint.Align.CENTER, 0);
-            int b = host.brightness();
-            for (int i = 0; i < MENU.length; i++)
-                row(c, i, i == sel, MENU[i], null, i == 2 ? (b < 0 ? "AUTO" : b + " %") : i == 8 ? (host.blockSleep() ? "VEILLE BLOQUÉE" : "VEILLE ACTIVE") : i == 9 ? (host.bellVolume() > 0 ? host.bellVolume() + " %" : "COUPÉE") : null,
-                        i == 8 && !host.blockSleep() ? MUTE : CYAN);
+            for (int i = 0; i < MENU.length; i++) row(c, i, i == sel, MENU[i], null, i >= 2 && i <= 4 ? "›" : null, 0xFF2A3A4C);
+        } else if (mode == M_SUB) {
+            panelHeader(c, SUBT[subId], subId == 2 ? "OUVRIR  ›" : "CHANGER  ›");
+            for (int i = 0; i < SUB[subId].length; i++) {
+                String ch = subChip(subId, i);
+                boolean off = ch.contains("COUP") || ch.contains("DÉSACT") || ch.equals("VEILLE ACTIVE");
+                row(c, i, i == sel, SUB[subId][i], null, ch, ch.equals("›") ? 0xFF2A3A4C : off ? MUTE : CYAN);
+            }
         } else if (mode == M_SENS) {
             if (n - sensRefresh > 1000) { sensCache = host.sensorList(); sensRefresh = n; if (sel >= sensCache.size()) sel = Math.max(0, sensCache.size() - 1); }
             String act = null;
@@ -1450,9 +1498,9 @@ public class Dash extends View {
             String rd = host.radarDebug();
             if (!rd.isEmpty()) text(c, rd, 240, H - 74, b6, 11, DIM, Paint.Align.CENTER, 0);
         } else if (mode == M_PROF) {
-            panelHeader(c, "PROFIL", profEdit ? "VALIDER  ✓" : profSel == 3 ? "ACTIVER / DÉSACTIVER" : "MODIFIER  ›");
-            String[] lab = {"FTP", "FC MAX", "POIDS", "PAUSE AUTOMATIQUE"};
-            String[] val = {m.ftp + " W", m.hrMax + " bpm", String.format(Locale.US, "%.1f kg", m.weight), host.autoPause() ? "ACTIVÉE" : "DÉSACTIVÉE"};
+            panelHeader(c, "PROFIL", profEdit ? "VALIDER  ✓" : "MODIFIER  ›");
+            String[] lab = {"FTP", "FC MAX", "POIDS", "CdA (AÉRO, POUR LE COÛT DU VENT)"};
+            String[] val = {m.ftp + " W", m.hrMax + " bpm", String.format(Locale.US, "%.1f kg", m.weight), String.format(Locale.US, "%.2f m²", m.cda)};
             for (int i = 0; i < 4; i++) {
                 boolean on = i == profSel;
                 float t = ROW0 + i * 110 - 30, b = t + 100;
@@ -1488,9 +1536,10 @@ public class Dash extends View {
         }
         if (mode == M_HIST) { if (y > H - 64 || y < 56) mode = M_HOME; invalidate(); return; }
         if (y > H - 64) { button(x < 240 ? "lap" : "startstop"); return; } // boutons du bas : retour / action
-        if (mode == M_MENU || mode == M_SENS) {
+        if (mode == M_MENU || mode == M_SENS || mode == M_SUB) {
             int i = (int) Math.floor((y - (ROW0 - 30)) / ROWH);
             if (mode == M_MENU && i >= 0 && i < MENU.length) { sel = i; menuOk(i); }
+            else if (mode == M_SUB && i >= 0 && i < SUB[subId].length) { sel = i; subOk(subId, i); }
             else if (mode == M_SENS) {
                 int max = Math.max(1, (int) ((H - 74 - (ROW0 - 30 + ROWH)) / ROWH));
                 int start = Math.max(0, Math.min(sel - max + 1, sensCache.size() - max));
@@ -1499,10 +1548,9 @@ public class Dash extends View {
             }
         } else if (mode == M_PROF) {
             int i = (int) Math.floor((y - (ROW0 - 30)) / 110);
-            if (i == 3) { profSel = 3; profEdit = false; host.setAutoPause(!host.autoPause()); }
-            else if (i >= 0 && i < 3) {
+            if (i >= 0 && i < 4) {
                 if (profEdit && i == profSel && x > 326) adjust(x < 394 ? -1 : 1);
-                else if (profEdit && i == profSel) { profEdit = false; host.saveCfg(m.ftp, m.hrMax, m.weight); }
+                else if (profEdit && i == profSel) { profEdit = false; host.saveCfg(m.ftp, m.hrMax, m.weight); host.saveCda(m.cda); }
                 else { profSel = i; profEdit = true; }
             }
         }

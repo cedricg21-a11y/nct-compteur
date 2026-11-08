@@ -5,7 +5,7 @@ import java.util.ArrayList;
 /** Moteur de métriques : NP, IF, TSS, W'bal, zones, pente, VAM, tours. */
 public class Metrics {
     public int ftp = 250, hrMax = 185;
-    public double weight = 72, wPrime = 20000;
+    public double weight = 72, wPrime = 20000, cda = 0.32;
 
     public static final String[] ZN = {"Z1", "Z2", "Z3", "Z4", "Z5", "Z6", "Z7"};
     public static final String[] ZNAME = {"RÉCUP", "ENDURANCE", "TEMPO", "SEUIL", "PMA", "ANAÉROBIE", "SPRINT"};
