@@ -31,10 +31,29 @@ public class RideService extends Service {
             wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "nct:ride");
             wl.acquire(12 * 3600 * 1000L);
         }
+        if (screenRx == null) {
+            screenRx = new android.content.BroadcastReceiver() {
+                @Override public void onReceive(android.content.Context ctx, Intent i) {
+                    // bouton marche : on rallume aussitôt l'écran et on revient sur l'appli
+                    if (!getSharedPreferences("cfg", MODE_PRIVATE).getBoolean("blockSleep", true)) return;
+                    PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+                    @SuppressWarnings("deprecation")
+                    PowerManager.WakeLock w = pm.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP, "nct:wake");
+                    w.acquire(3000);
+                    Intent a = new Intent(RideService.this, MainActivity.class);
+                    a.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+                    try { startActivity(a); } catch (Exception ignored) {}
+                }
+            };
+            registerReceiver(screenRx, new android.content.IntentFilter(Intent.ACTION_SCREEN_OFF));
+        }
         return START_STICKY;
     }
 
+    private android.content.BroadcastReceiver screenRx;
+
     @Override public void onDestroy() {
+        if (screenRx != null) { try { unregisterReceiver(screenRx); } catch (Exception ignored) {} screenRx = null; }
         if (wl != null && wl.isHeld()) wl.release();
         wl = null;
         super.onDestroy();

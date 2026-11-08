@@ -29,6 +29,8 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
                 | WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
                 | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD);
+        if (android.os.Build.VERSION.SDK_INT >= 27) { setShowWhenLocked(true); setTurnScreenOn(true); }
         keys = getSharedPreferences("keys", MODE_PRIVATE);
         cfg = getSharedPreferences("cfg", MODE_PRIVATE);
 
@@ -210,6 +212,8 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
         if (sim != null) { sim.state = sim.state.equals("rec") ? "pause" : "rec"; sample(sim.step()); return; }
         ride.startStop();
     }
+    @Override public boolean blockSleep() { return cfg.getBoolean("blockSleep", true); }
+    @Override public void setBlockSleep(boolean on) { cfg.edit().putBoolean("blockSleep", on).apply(); }
     @Override public void discardRide() { if (map != null) map.clearTrack(); if (sim == null) ride.discard(); }
     @Override public void lap() { ride.lap(); }
     @Override public String finishRide() {

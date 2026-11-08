@@ -28,6 +28,8 @@ public class Dash extends View {
 
     public interface Host {
         void startStop();
+        boolean blockSleep();
+        void setBlockSleep(boolean on);
         void discardRide();
         void lap();
         String finishRide();
@@ -63,7 +65,7 @@ public class Dash extends View {
     private int backMode = M_DASH, homeSel = 0, histSel = 0;
     private boolean mapExplore;
     private java.util.List<org.json.JSONObject> rides = new java.util.ArrayList<>();
-    static final String[] MENU = {"CAPTEURS", "PROFIL", "LUMINOSITÉ", "BOUTONS", "WI-FI", "BLUETOOTH", "PARAMÈTRES ANDROID", "QUITTER", "RETOUR"};
+    static final String[] MENU = {"CAPTEURS", "PROFIL", "LUMINOSITÉ", "BOUTONS", "WI-FI", "BLUETOOTH", "PARAMÈTRES ANDROID", "QUITTER", "BOUTON MARCHE"};
     static final int[] BRIGHT = {-1, 5, 15, 30, 50, 75, 100};
     private int mode = M_HOME, sel = 0, profSel = 0;
     private boolean profEdit;
@@ -145,6 +147,7 @@ public class Dash extends View {
             case 5: host.openSettings(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS); break;
             case 6: host.openAndroidSettings(); break;
             case 7: if (state.equals("idle")) host.quitApp(); else toast("SORTIE EN COURS", AMBER); break;
+            case 8: host.setBlockSleep(!host.blockSleep()); break;
             default: mode = backMode;
         }
     }
@@ -1263,7 +1266,8 @@ public class Dash extends View {
             text(c, "NCT Compteur v" + version, 240, H - 72, b6, 12, DIM, Paint.Align.CENTER, 0);
             int b = host.brightness();
             for (int i = 0; i < MENU.length; i++)
-                row(c, i, i == sel, MENU[i], null, i == 2 ? (b < 0 ? "AUTO" : b + " %") : null, CYAN);
+                row(c, i, i == sel, MENU[i], null, i == 2 ? (b < 0 ? "AUTO" : b + " %") : i == 8 ? (host.blockSleep() ? "VEILLE BLOQUÉE" : "VEILLE ACTIVE") : null,
+                        i == 8 && !host.blockSleep() ? MUTE : CYAN);
         } else if (mode == M_SENS) {
             if (n - sensRefresh > 1000) { sensCache = host.sensorList(); sensRefresh = n; if (sel >= sensCache.size()) sel = Math.max(0, sensCache.size() - 1); }
             String act = null;
