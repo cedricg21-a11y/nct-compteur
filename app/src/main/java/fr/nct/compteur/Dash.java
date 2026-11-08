@@ -377,9 +377,18 @@ public class Dash extends View {
         }
         if (e.getAction() == MotionEvent.ACTION_UP) {
             float dx = (e.getX() - sx0) / sc, x = e.getX() / sc, y = e.getY() / sc;
-            if (learnStep >= 0) return true;
+            if (learnStep >= 0) {
+                if (y > H - 64) { learnStep = -1; host.setLearning(false); toast("CONFIGURATION ANNULÉE", AMBER); invalidate(); }
+                return true;
+            }
             if (summary) { summary = false; goHome(); return true; }
+            if (now() < confirmUntil) {
+                if (y > H - 64) button(x < 240 ? "startstop" : "lap");
+                return true;
+            }
             if (mode != M_DASH) { menuTap(x, y); return true; }
+            boolean paused = state.equals("pause") || state.equals("auto");
+            if (paused && Math.abs(dx) < 30 && y > H - 64 - 58 && y < H - 64 - 8) { button(x < 240 ? "startstop" : "lap"); return true; }
             if (Math.abs(dx) > 60) button(dx < 0 ? "next" : "prev");
             else if (y < 56) openMenu();              // appui sur l'en-tête : menu
             else if (y > H - 64 && x < 140) button("startstop");
@@ -912,6 +921,7 @@ public class Dash extends View {
             text(c, confirmTitle, 240, H / 2 - 20, bc8, 46, TXT, Paint.Align.CENTER, 0);
             text(c, confirmSub1, 240, H / 2 + 30, b6, 20, MUTE, Paint.Align.CENTER, 0);
             text(c, confirmSub2, 240, H / 2 + 60, b6, 20, MUTE, Paint.Align.CENTER, 0);
+            footBtns(c, "REPRENDRE", "TERMINER  ✓");
         }
         // apprentissage des boutons
         if (learnStep >= 0) {
@@ -921,6 +931,7 @@ public class Dash extends View {
             text(c, "Appuie sur le bouton", 240, H / 2 - 50, b6, 28, TXT, Paint.Align.CENTER, 0);
             text(c, LEARN[learnStep][1], 240, H / 2 + 20, bc8, 56, CYAN, Paint.Align.CENTER, .02f);
             text(c, learnErr, 240, H / 2 + 80, bc6, 20, ORANGE, Paint.Align.CENTER, 0);
+            footBtns(c, "ANNULER", null);
         }
     }
 
@@ -941,7 +952,7 @@ public class Dash extends View {
         }
         if (sumFile != null) text(c, "NCT / " + sumFile, 240, H - 64 - 14, b6, 13, DIM, Paint.Align.CENTER, 0);
         pf.setColor(0xE6090E14); c.drawRect(0, H - 64, 480, H, pf);
-        text(c, "Appuie sur un bouton pour continuer", 240, H - 26, b6, 15, MUTE, Paint.Align.CENTER, 0);
+        footBtns(c, null, "CONTINUER  ›");
     }
 
     private void drawSplash(Canvas c, long n) {
@@ -990,7 +1001,23 @@ public class Dash extends View {
         pf.setColor(LINE); c.drawRect(0, 51, 480, 52, pf);
         pf.setColor(0xE6090E14); c.drawRect(0, H - 64, 480, H, pf);
         pf.setColor(LINE); c.drawRect(0, H - 64, 480, H - 63, pf);
-        text(c, hint, 240, H - 26, b6, 15, MUTE, Paint.Align.CENTER, 0);
+        footBtns(c, "‹  RETOUR", hint);
+    }
+
+    /** deux boutons tactiles en bas d'écran : gauche = retour (TOUR), droite = action (START) */
+    private void footBtns(Canvas c, String left, String right) {
+        float t = H - 54, b = H - 10;
+        if (left != null) {
+            float r = right != null ? 234 : 468;
+            pf.setColor(TILE); rf.set(12, t, r, b); c.drawRoundRect(rf, 12, 12, pf);
+            ps.setColor(0xFF2A3746); ps.setStrokeWidth(1.5f); c.drawRoundRect(rf, 12, 12, ps);
+            text(c, left, (12 + r) / 2, t + 30, bc7, 19, TXT, Paint.Align.CENTER, .08f);
+        }
+        if (right != null) {
+            float l = left != null ? 246 : 12;
+            pf.setColor(CYAN); rf.set(l, t, 468, b); c.drawRoundRect(rf, 12, 12, pf);
+            text(c, right, (l + 468) / 2, t + 30, bc7, 19, BG, Paint.Align.CENTER, .08f);
+        }
     }
 
     private void drawGlowStatic(Canvas c) {
@@ -1122,7 +1149,7 @@ public class Dash extends View {
     }
 
     private void drawHistory(Canvas c, long n) {
-        panelHeader(c, "HISTORIQUE", "▲▼ parcourir  ·  TOUR retour");
+        panelHeader(c, "HISTORIQUE", null);
         if (rides.isEmpty()) {
             text(c, "Aucune sortie enregistrée pour l'instant.", 240, H / 2, b6, 17, MUTE, Paint.Align.CENTER, 0);
             return;
@@ -1142,13 +1169,15 @@ public class Dash extends View {
         if (mode == M_HOME) { drawHome(c, n); return; }
         if (mode == M_HIST) { drawHistory(c, n); return; }
         if (mode == M_MENU) {
-            panelHeader(c, "MENU", "▲▼ naviguer  ·  START valider  ·  TOUR retour");
+            panelHeader(c, "MENU", "VALIDER  ›");
             int b = host.brightness();
             for (int i = 0; i < MENU.length; i++)
                 row(c, i, i == sel, MENU[i], null, i == 2 ? (b < 0 ? "AUTO" : b + " %") : null, CYAN);
         } else if (mode == M_SENS) {
             if (n - sensRefresh > 1000) { sensCache = host.sensorList(); sensRefresh = n; if (sel >= sensCache.size()) sel = Math.max(0, sensCache.size() - 1); }
-            panelHeader(c, "CAPTEURS", "START ajouter / retirer  ·  TOUR retour");
+            String act = null;
+            if (sel < sensCache.size()) act = host.sensorStatus(sensCache.get(sel)).isEmpty() ? "AJOUTER  +" : "RETIRER  ✕";
+            panelHeader(c, "CAPTEURS", act);
             String dots = new String[]{"", ".", "..", "..."}[(int) ((n / 400) % 4)];
             text(c, "Recherche en cours" + dots, 24, 84, b6, 15, MUTE, Paint.Align.LEFT, 0);
             if (sensCache.isEmpty()) {
@@ -1169,7 +1198,7 @@ public class Dash extends View {
                 row(c, i - start + 1, i == sel, tl + (st.isEmpty() ? "" : "  ·  ENREGISTRÉ"), f.name, chip, col);
             }
         } else if (mode == M_PROF) {
-            panelHeader(c, "PROFIL", profEdit ? "▲▼ modifier  ·  START valider" : "▲▼ choisir  ·  START modifier  ·  TOUR retour");
+            panelHeader(c, "PROFIL", profEdit ? "VALIDER  ✓" : profSel == 3 ? "ACTIVER / DÉSACTIVER" : "MODIFIER  ›");
             String[] lab = {"FTP", "FC MAX", "POIDS", "PAUSE AUTOMATIQUE"};
             String[] val = {m.ftp + " W", m.hrMax + " bpm", String.format(Locale.US, "%.1f kg", m.weight), host.autoPause() ? "ACTIVÉE" : "DÉSACTIVÉE"};
             for (int i = 0; i < 4; i++) {
@@ -1206,7 +1235,7 @@ public class Dash extends View {
             invalidate(); return;
         }
         if (mode == M_HIST) { if (y > H - 64 || y < 56) mode = M_HOME; invalidate(); return; }
-        if (y > H - 64) { button("lap"); return; } // bas d'écran : retour
+        if (y > H - 64) { button(x < 240 ? "lap" : "startstop"); return; } // boutons du bas : retour / action
         if (mode == M_MENU || mode == M_SENS) {
             int i = (int) Math.floor((y - (ROW0 - 30)) / ROWH);
             if (mode == M_MENU && i >= 0 && i < MENU.length) { sel = i; menuOk(i); }
