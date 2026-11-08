@@ -35,7 +35,48 @@ public class MainActivity extends Activity implements Ride.Ui {
                 | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
         keys = getSharedPreferences("keys", MODE_PRIVATE);
 
-        web = new WebView(this);
+        // rapport de plantage : on l'enregistre, et on l'affiche au lancement suivant
+        final Thread.UncaughtExceptionHandler def = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler((t, ex) -> {
+            try {
+                java.io.StringWriter sw = new java.io.StringWriter();
+                ex.printStackTrace(new java.io.PrintWriter(sw));
+                getSharedPreferences("crash", MODE_PRIVATE).edit().putString("last", sw.toString()).commit();
+            } catch (Throwable ignored) {}
+            if (def != null) def.uncaughtException(t, ex);
+        });
+        String crash = getSharedPreferences("crash", MODE_PRIVATE).getString("last", null);
+        if (crash != null) {
+            getSharedPreferences("crash", MODE_PRIVATE).edit().remove("last").commit();
+            showError("L'appli a planté au dernier lancement.\nPrends une photo de cet écran et envoie-la à Claude.\nAppuie sur un bouton pour relancer.\n\n" + crash, true);
+            return;
+        }
+
+        try {
+            web = new WebView(this);
+        } catch (Throwable ex) {
+            java.io.StringWriter sw = new java.io.StringWriter();
+            ex.printStackTrace(new java.io.PrintWriter(sw));
+            showError("Impossible de créer le WebView (composant d'affichage Android).\nPrends une photo de cet écran et envoie-la à Claude.\n\n" + sw, false);
+            return;
+        }
+        setupWeb();
+    }
+
+    private boolean errorScreen, relaunchOnKey;
+
+    private void showError(String msg, boolean relaunch) {
+        errorScreen = true; relaunchOnKey = relaunch;
+        android.widget.ScrollView sv = new android.widget.ScrollView(this);
+        android.widget.TextView tv = new android.widget.TextView(this);
+        tv.setText(msg); tv.setTextColor(0xFFEEF3F7); tv.setTextSize(11); tv.setPadding(20, 30, 20, 30);
+        if (relaunch) tv.setOnClickListener(v -> recreate());
+        sv.setBackgroundColor(0xFF090E14); sv.addView(tv);
+        setContentView(sv);
+    }
+
+    @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
+    private void setupWeb() {
         web.setBackgroundColor(0xFF090E14);
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
@@ -65,6 +106,7 @@ public class MainActivity extends Activity implements Ride.Ui {
     }
 
     private void askPermissions() {
+        if (ride == null) return;
         String[] perms = {Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.WRITE_EXTERNAL_STORAGE};
         List<String> need = new ArrayList<>();
         for (String p : perms) if (checkSelfPermission(p) != PackageManager.PERMISSION_GRANTED) need.add(p);
@@ -73,13 +115,13 @@ public class MainActivity extends Activity implements Ride.Ui {
     }
 
     @Override public void onRequestPermissionsResult(int rc, String[] p, int[] r) {
-        ride.restartSensors();
+        if (ride != null) ride.restartSensors();
     }
 
     @Override protected void onResume() {
         super.onResume();
         immersive();
-        ride.attach(this);
+        if (ride != null) ride.attach(this);
     }
 
     @Override public void onWindowFocusChanged(boolean f) { super.onWindowFocusChanged(f); if (f) immersive(); }
@@ -92,7 +134,7 @@ public class MainActivity extends Activity implements Ride.Ui {
     }
 
     @Override protected void onDestroy() {
-        ride.detach(this);
+        if (ride != null) ride.detach(this);
         super.onDestroy();
     }
 
@@ -100,6 +142,7 @@ public class MainActivity extends Activity implements Ride.Ui {
 
     @Override public boolean onKeyDown(int code, KeyEvent e) {
         if (code == KeyEvent.KEYCODE_POWER) return super.onKeyDown(code, e);
+        if (errorScreen) { if (relaunchOnKey) recreate(); return code != KeyEvent.KEYCODE_BACK || super.onKeyDown(code, e); }
         if (e.getRepeatCount() > 0) return true;
         if (learning) { js("NCT.onKey(" + code + ")"); return true; }
         String action = actionFor(code);
@@ -110,6 +153,7 @@ public class MainActivity extends Activity implements Ride.Ui {
     }
 
     @Override public boolean onKeyUp(int code, KeyEvent e) {
+        if (errorScreen) return super.onKeyUp(code, e);
         if (code == KeyEvent.KEYCODE_POWER || code == KeyEvent.KEYCODE_BACK && actionFor(code) == null && !learning)
             return super.onKeyUp(code, e);
         return true;
