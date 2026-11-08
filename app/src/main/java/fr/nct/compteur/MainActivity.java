@@ -299,6 +299,7 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
     @Override public String mapInfo() { return map == null ? "" : map.info; }
     @Override public void setMapVisible(boolean on) { if (map != null) map.setVisible(on); }
     @Override public void mapZoom(int d) { if (map != null) map.zoom(d); }
+    @Override public void mapTransform(float px, float py, float rot) { if (map != null) map.transform(px, py, rot); }
 
     @Override public void openSettings(String action) {
         try { startActivity(new android.content.Intent(action)); }

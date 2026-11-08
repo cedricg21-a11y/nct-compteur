@@ -146,8 +146,37 @@ public class MapHolder {
         if (!ready || lastPos == null || view == null) return null;
         try {
             org.mapsforge.core.model.Point pt = new org.mapsforge.map.util.MapViewProjection(view).toPixels(lastPos);
-            return pt == null ? null : new float[]{(float) pt.x, (float) pt.y};
+            return pt == null ? null : new float[]{(float) pt.x + view.getTranslationX(), (float) pt.y + view.getTranslationY()};
         } catch (Throwable t) { return null; }
+    }
+
+    private float lastPX = -1, lastPY = -1, lastRot = 9999;
+    private int side = 0;
+
+    /**
+     * Place la carte (carré plus grand que l'écran) centrée sur le point du cycliste et la fait tourner
+     * autour de ce point : carte orientée dans le sens de la marche.
+     */
+    public void transform(float px, float py, float rot) {
+        if (view == null || view.getParent() == null) return;
+        View parent = (View) view.getParent();
+        int W = parent.getWidth(), H = parent.getHeight();
+        if (W == 0) return;
+        if (px != lastPX || py != lastPY || side == 0) {
+            double d = 0;
+            for (float[] cr : new float[][]{{0, 0}, {W, 0}, {0, H}, {W, H}}) d = Math.max(d, Math.hypot(cr[0] - px, cr[1] - py));
+            int s = (int) Math.ceil(2 * d) + 4;
+            if (s != side) {
+                side = s;
+                android.widget.FrameLayout.LayoutParams lp = new android.widget.FrameLayout.LayoutParams(s, s);
+                view.setLayoutParams(lp);
+            }
+            view.setTranslationX(px - side / 2f);
+            view.setTranslationY(py - side / 2f);
+            view.setPivotX(side / 2f); view.setPivotY(side / 2f);
+            lastPX = px; lastPY = py;
+        }
+        if (Math.abs(rot - lastRot) > 0.3f) { view.setRotation(-rot); lastRot = rot; }
     }
 
     public void zoom(int d) {

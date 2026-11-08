@@ -49,6 +49,7 @@ public class Dash extends View {
         String mapInfo();
         void setMapVisible(boolean on);
         void mapZoom(int d);
+        void mapTransform(float pivotX, float pivotY, float rotation);
         void openSettings(String action);
         int brightness();          // -1 = auto (système), sinon 1..100
         void setBrightness(int pct);
@@ -362,19 +363,22 @@ public class Dash extends View {
     public void toast(String t, int col) { toastTxt = t; toastCol = col; toastT = now(); invalidate(); }
 
     private float sx0;
+    private boolean ignoreUp;
     @Override public boolean onTouchEvent(MotionEvent e) {
         if (e.getAction() == MotionEvent.ACTION_DOWN) {
             float x = e.getX() / sc, y = e.getY() / sc;
+            sx0 = e.getX(); ignoreUp = false;
             if (mapShown && mode == M_DASH && y > 52 && y < mapBottom()) {
-                if (x > 416 && y < 52 + 68) { host.mapZoom(1); return true; }
-                if (x > 416 && y > 52 + 68 && y < 52 + 124) { host.mapZoom(-1); return true; }
+                if (x > 416 && y < 52 + 68) { host.mapZoom(1); ignoreUp = true; return true; }
+                if (x > 416 && y > 52 + 68 && y < 52 + 124) { host.mapZoom(-1); ignoreUp = true; return true; }
                 if (y > 52 + 124 && y < 52 + 180 && x > (mapExplore ? 296 : 416)) {
-                    mapExplore = !mapExplore; host.mapExplore(mapExplore); invalidate(); return true;
+                    mapExplore = !mapExplore; host.mapExplore(mapExplore); ignoreUp = true; invalidate(); return true;
                 }
                 if (mapExplore) return false; // la carte reçoit le geste (déplacement, pincement)
             }
-            sx0 = e.getX(); return true;
+            return true;
         }
+        if (e.getAction() == MotionEvent.ACTION_UP && ignoreUp) { ignoreUp = false; return true; }
         if (e.getAction() == MotionEvent.ACTION_UP) {
             float dx = (e.getX() - sx0) / sc, x = e.getX() / sc, y = e.getY() / sc;
             if (learnStep >= 0) {
@@ -421,6 +425,11 @@ public class Dash extends View {
         drawGlow(c, n);
         c.restore();
         drawHeader(c);
+        // carte orientée dans le sens de la marche
+        float db = ((s.bearing - shownBearing + 540) % 360) - 180;
+        shownBearing = (shownBearing + db * 0.15f + 360) % 360;
+        mapRot = mapExplore || !headingUp ? 0 : shownBearing;
+        if (mapShown) host.mapTransform(240 * sc, pivotY() * sc, mapRot);
 
         // pages (glissement)
         c.save();
@@ -443,7 +452,10 @@ public class Dash extends View {
     }
 
     private boolean mapShown;
-    private float shownBearing = 0;
+    private float shownBearing = 0, mapRot = 0;
+    public boolean headingUp = true;
+    /** position du cycliste à l'écran : aux 2/3 bas de la carte pour voir la route devant */
+    float pivotY() { return 52 + (mapBottom() - 52) * 0.66f; }
     float mapBottom() { return H - 64 - 116; }
 
     // ---------------------------------------------------------------- page carte
@@ -466,13 +478,10 @@ public class Dash extends View {
             pf.setShader(new LinearGradient(0, mb - 50, 0, mb, 0x00090E14, 0xCC090E14, Shader.TileMode.CLAMP));
             c.drawRect(0, mb - 50, 480, mb, pf); pf.setShader(null);
             // position : flèche orientée selon le cap (carte nord en haut), au centre de la vue carte
-            float px = 240, py = H / 2f;
-            float[] mp = host.mapPos();
-            if (mp != null) { px = mp[0] / sc; py = mp[1] / sc; }
+            float px = 240, py = pivotY();
+            if (mapExplore) { float[] mp = host.mapPos(); if (mp != null) { px = mp[0] / sc; py = mp[1] / sc; } }
             drawWindRing(c, px, py);
-            float db = ((s.bearing - shownBearing + 540) % 360) - 180;
-            shownBearing = (shownBearing + db * 0.2f + 360) % 360;
-            c.save(); c.translate(px, py); c.rotate(shownBearing);
+            c.save(); c.translate(px, py); c.rotate(shownBearing - mapRot);
             pf.setColor(0x5500E5C8); c.drawCircle(0, 0, 24, pf);
             path.reset(); path.moveTo(0, -17); path.lineTo(12, 13); path.lineTo(0, 6); path.lineTo(-12, 13); path.close();
             pf.setColor(0xFFFFFFFF); c.drawPath(path, pf);
@@ -515,8 +524,8 @@ public class Dash extends View {
         float R = 46;
         ps.setColor(0x99090E14); ps.setStrokeWidth(7); c.drawCircle(px, py, R, ps);
         ps.setColor(0x55FFFFFF); ps.setStrokeWidth(1.5f); c.drawCircle(px, py, R, ps);
-        // carte nord en haut : le point est placé à la direction d'où vient le vent
-        double a = Math.toRadians(w[0]);
+        // le point est placé à la direction d'où vient le vent, dans le repère de la carte (tournée ou non)
+        double a = Math.toRadians(w[0] - mapRot);
         float dx = (float) Math.sin(a), dy = (float) -Math.cos(a);
         float x = px + R * dx, y = py + R * dy;
         // petite flèche vers le cycliste (sens du vent)
@@ -540,16 +549,17 @@ public class Dash extends View {
         // mini-boussole nord
         float cx = l + 32, cy = t + 37;
         ps.setColor(0xFF2A3644); ps.setStrokeWidth(2); c.drawCircle(cx, cy, 20, ps);
+        c.save(); c.rotate(-mapRot, cx, cy);
         path.reset(); path.moveTo(cx, cy - 19); path.lineTo(cx + 5, cy - 9); path.lineTo(cx - 5, cy - 9); path.close();
         pf.setColor(MUTE); c.drawPath(path, pf);
-        text(c, "N", cx, cy - 22, bc7, 10, MUTE, Paint.Align.CENTER, 0);
+        c.restore();
         if (w == null) {
             text(c, "VENT", l + 64, t + 32, b7, 12, MUTE, Paint.Align.LEFT, .14f);
             text(c, "pas de prévision", l + 64, t + 54, b6, 13, DIM, Paint.Align.LEFT, 0);
             return;
         }
-        // flèche du vent dans la boussole (sens du vent, vers où il souffle)
-        double a = Math.toRadians(w[0]);
+        // flèche du vent dans la boussole (sens du vent, vers où il souffle), dans le repère de la carte
+        double a = Math.toRadians(w[0] - mapRot);
         float dx = (float) Math.sin(a), dy = (float) -Math.cos(a);
         ps.setColor(ORANGE); ps.setStrokeWidth(4); ps.setStrokeCap(Paint.Cap.ROUND);
         c.drawLine(cx + 16 * dx, cy + 16 * dy, cx - 8 * dx, cy - 8 * dy, ps);
