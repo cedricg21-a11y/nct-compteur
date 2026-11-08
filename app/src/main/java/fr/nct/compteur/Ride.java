@@ -124,8 +124,34 @@ public class Ride implements Ble.Listener, LocationListener, SensorEventListener
         }
     };
 
+    private long lastRecover = 0, lastGpsRestart = 0;
+
+    /** relance GPS + capteurs (appelée au rallumage de l'écran et par la surveillance) */
+    public void recover(boolean verbose) {
+        long now = System.currentTimeMillis();
+        lastRecover = now;
+        String msg = ble.recover();
+        boolean gpsOff = false;
+        try {
+            LocationManager lm = (LocationManager) ctx.getSystemService(Context.LOCATION_SERVICE);
+            if (!lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) gpsOff = true;
+            else if (!gpsFix && now - lastGpsRestart > 20000) {
+                lm.removeUpdates(this);
+                lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 0, this, Looper.getMainLooper());
+                lastGpsRestart = now;
+                if (verbose && msg == null) msg = "GPS RELANCÉ";
+            }
+        } catch (SecurityException ignored) {}
+        if (ui != null) {
+            if (gpsOff) ui.event("sensor", "✕ GPS DÉSACTIVÉ PAR LE SYSTÈME");
+            else if (msg != null && verbose) ui.event("sensor", "↻ " + msg);
+        }
+    }
+
     private void step(long now) {
         if (now - lastFixMs > 5000) gpsFix = false;
+        // surveillance : toutes les 15 s, on relance ce qui a décroché
+        if (started && now - lastRecover > 15000) recover(false);
         double spd = speedKmh();
         double alt = altitude();
         int p = ble.power, hr = ble.heartRate, cad = ble.cadence;

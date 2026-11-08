@@ -127,8 +127,13 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
     @Override protected void onResume() {
         super.onResume();
         immersive();
-        if (ride != null) ride.attach(this);
+        if (ride != null) {
+            ride.attach(this);
+            if (resumedOnce && sim == null) ride.recover(true); // retour de veille : on relance tout
+            resumedOnce = true;
+        }
     }
+    private boolean resumedOnce;
 
     @Override public void onWindowFocusChanged(boolean f) { super.onWindowFocusChanged(f); if (f) immersive(); }
 

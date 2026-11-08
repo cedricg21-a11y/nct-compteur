@@ -44,7 +44,7 @@ public class Ble {
     class Link {
         final String type; // pwr | hr | csc
         BluetoothDevice dev; BluetoothGatt gatt; String name = "";
-        boolean connected; long lastData;
+        boolean connected; long lastData, connectT;
         Link(String t) { type = t; }
     }
 
@@ -89,6 +89,32 @@ public class Ble {
         stopScan();
         h.removeCallbacks(watchdog);
         for (Link l : new Link[]{pwr, hr, csc}) if (l.gatt != null) { l.gatt.close(); l.gatt = null; l.connected = false; }
+    }
+
+    /**
+     * Récupération après une coupure (veille, ROM qui coupe le Bluetooth) :
+     * réactive le Bluetooth si besoin et relance les connexions aux capteurs enregistrés.
+     * Retourne un message si une action a été faite.
+     */
+    public String recover() {
+        if (adapter == null) return null;
+        if (!adapter.isEnabled()) {
+            adapter.enable();
+            h.postDelayed(() -> { scanning = false; start(); }, 3000);
+            return "BLUETOOTH RÉACTIVÉ";
+        }
+        long now = System.currentTimeMillis();
+        boolean did = false;
+        for (Link l : new Link[]{pwr, hr, csc}) {
+            String addr = prefs.getString(l.type, null);
+            if (addr == null || l.connected) continue;
+            if (l.gatt != null && now - l.connectT < 10000) continue; // connexion en cours
+            if (l.gatt != null) { try { l.gatt.close(); } catch (Exception ignored) {} l.gatt = null; }
+            connect(l, adapter.getRemoteDevice(addr));
+            did = true;
+        }
+        if (did) { stopScan(); scanning = false; startScan(); }
+        return did ? "RECONNEXION DES CAPTEURS…" : null;
     }
 
     /** Oublie les capteurs mémorisés et relance une recherche. */
@@ -201,6 +227,7 @@ public class Ble {
         l.dev = d;
         l.name = d.getName() != null ? d.getName() : d.getAddress();
         Log.i(TAG, "connexion " + l.type + " " + l.name);
+        l.connectT = System.currentTimeMillis();
         l.gatt = d.connectGatt(ctx, false, new GattCb(l), BluetoothDevice.TRANSPORT_LE);
     }
 

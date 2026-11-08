@@ -35,6 +35,11 @@ public class RideService extends Service {
             screenRx = new android.content.BroadcastReceiver() {
                 @Override public void onReceive(android.content.Context ctx, Intent i) {
                     // bouton marche : on rallume aussitôt l'écran et on revient sur l'appli
+                    if (Intent.ACTION_SCREEN_ON.equals(i.getAction())) {
+                        // écran rallumé : relance capteurs + GPS (après un court délai, le temps que la ROM réactive les radios)
+                        new android.os.Handler().postDelayed(() -> Ride.get(RideService.this).recover(true), 1500);
+                        return;
+                    }
                     if (!getSharedPreferences("cfg", MODE_PRIVATE).getBoolean("blockSleep", true)) return;
                     PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
                     @SuppressWarnings("deprecation")
@@ -45,7 +50,9 @@ public class RideService extends Service {
                     try { startActivity(a); } catch (Exception ignored) {}
                 }
             };
-            registerReceiver(screenRx, new android.content.IntentFilter(Intent.ACTION_SCREEN_OFF));
+            android.content.IntentFilter f = new android.content.IntentFilter(Intent.ACTION_SCREEN_OFF);
+            f.addAction(Intent.ACTION_SCREEN_ON);
+            registerReceiver(screenRx, f);
         }
         return START_STICKY;
     }
