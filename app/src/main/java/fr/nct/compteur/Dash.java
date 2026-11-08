@@ -714,7 +714,7 @@ public class Dash extends View {
     /** bande radar sur le bord droit : véhicules positionnés selon leur distance (0 en bas, 140 m en haut) */
     private void drawRadar(Canvas c, long n) {
         if (!s.sRadar) return;
-        float t = HDR + 8, b = H - BAND - 8, x0 = 468, x1 = 478;
+        float t = HDR + 8, b = H - BAND - 8, x0 = 472, x1 = 478;
         int cnt = s.rDist.length;
         boolean danger = false;
         for (int i = 0; i < cnt; i++) if (s.rDist[i] < 40) danger = true;
