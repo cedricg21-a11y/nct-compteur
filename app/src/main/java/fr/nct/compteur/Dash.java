@@ -41,6 +41,10 @@ public class Dash extends View {
         void setAutoPause(boolean on);
         void openAndroidSettings();
         boolean mapReady();
+        float[] mapPos();
+        void mapExplore(boolean on);
+        java.util.List<org.json.JSONObject> rides();
+        void saveRide(org.json.JSONObject r);
         String mapInfo();
         void setMapVisible(boolean on);
         void mapZoom(int d);
@@ -51,28 +55,44 @@ public class Dash extends View {
     }
 
     // ---------------------------------------------------------------- menus
-    static final int M_DASH = 0, M_MENU = 1, M_SENS = 2, M_PROF = 3;
+    static final int M_DASH = 0, M_MENU = 1, M_SENS = 2, M_PROF = 3, M_HOME = 4, M_HIST = 5;
+    static final String[] HOME = {"ROULER", "SÉANCES", "HISTORIQUE", "MA FORME", "MES PAGES", "CAPTEURS", "RÉGLAGES"};
+    private int backMode = M_DASH, homeSel = 0, histSel = 0;
+    private boolean mapExplore;
+    private java.util.List<org.json.JSONObject> rides = new java.util.ArrayList<>();
     static final String[] MENU = {"CAPTEURS", "PROFIL", "LUMINOSITÉ", "BOUTONS", "WI-FI", "BLUETOOTH", "PARAMÈTRES ANDROID", "QUITTER", "RETOUR"};
     static final int[] BRIGHT = {-1, 5, 15, 30, 50, 75, 100};
-    private int mode = M_DASH, sel = 0, profSel = 0;
+    private int mode = M_HOME, sel = 0, profSel = 0;
     private boolean profEdit;
     private java.util.List<Ble.Found> sensCache = new java.util.ArrayList<>();
     private long sensRefresh;
 
-    public void openMenu() { mode = M_MENU; sel = 0; invalidate(); }
+    public void openMenu() { backMode = (mode == M_HOME) ? M_HOME : M_DASH; mode = M_MENU; sel = 0; invalidate(); }
+    public void goHome() { mode = M_HOME; homeSel = 0; rides = host.rides(); invalidate(); }
+    public void goDash() { mode = M_DASH; invalidate(); }
     public void openMode(int md) { mode = md; sel = 0; if (md == M_SENS) host.setKeepScanning(true); invalidate(); }
 
     private void menuButton(String b) {
         if (mode == M_MENU) {
             if (b.equals("next")) sel = (sel + 1) % MENU.length;
             else if (b.equals("prev")) sel = (sel + MENU.length - 1) % MENU.length;
-            else if (b.equals("lap")) mode = M_DASH;
+            else if (b.equals("lap")) mode = backMode;
             else if (b.equals("startstop")) menuOk(sel);
+        } else if (mode == M_HOME) {
+            if (b.equals("next")) homeSel = (homeSel + 1) % HOME.length;
+            else if (b.equals("prev")) homeSel = (homeSel + HOME.length - 1) % HOME.length;
+            else if (b.equals("lap")) mode = M_DASH;
+            else if (b.equals("startstop")) homeOk(homeSel);
+        } else if (mode == M_HIST) {
+            int n = rides.size();
+            if (b.equals("next") && n > 0) histSel = (histSel + 1) % n;
+            else if (b.equals("prev") && n > 0) histSel = (histSel + n - 1) % n;
+            else if (b.equals("lap") || b.equals("startstop")) mode = M_HOME;
         } else if (mode == M_SENS) {
             int n = sensCache.size();
             if (b.equals("next") && n > 0) sel = (sel + 1) % n;
             else if (b.equals("prev") && n > 0) sel = (sel + n - 1) % n;
-            else if (b.equals("lap")) { host.setKeepScanning(false); mode = M_MENU; sel = 0; }
+            else if (b.equals("lap")) { host.setKeepScanning(false); mode = backMode == M_HOME && sensFromHome ? M_HOME : M_MENU; sel = 0; sensFromHome = false; }
             else if (b.equals("startstop") && sel < n) { host.toggleSensor(sensCache.get(sel)); sensRefresh = 0; }
         } else if (mode == M_PROF) {
             if (profEdit) {
@@ -87,6 +107,18 @@ public class Dash extends View {
             }
         }
         invalidate();
+    }
+
+    private boolean sensFromHome;
+
+    private void homeOk(int i) {
+        switch (i) {
+            case 0: mode = M_DASH; showPageNow(0); if (state.equals("idle")) host.startStop(); break;
+            case 2: mode = M_HIST; histSel = 0; rides = host.rides(); break;
+            case 5: backMode = M_HOME; sensFromHome = true; openMode(M_SENS); break;
+            case 6: openMenu(); break;
+            default: toast("BIENTÔT DISPONIBLE ✦", AMBER);
+        }
     }
 
     private void adjust(int d) {
@@ -110,7 +142,7 @@ public class Dash extends View {
             case 5: host.openSettings(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS); break;
             case 6: host.openAndroidSettings(); break;
             case 7: if (state.equals("idle")) host.quitApp(); else toast("SORTIE EN COURS", AMBER); break;
-            default: mode = M_DASH;
+            default: mode = backMode;
         }
     }
 
@@ -249,7 +281,7 @@ public class Dash extends View {
 
     public void button(String b) {
         if (learnStep >= 0) return;
-        if (summary) { summary = false; invalidate(); return; }
+        if (summary) { summary = false; goHome(); return; }
         if (mode != M_DASH) { menuButton(b); return; }
         switch (b) {
             case "next": showPage(cur + 1, 1); break;
@@ -268,12 +300,18 @@ public class Dash extends View {
                         sumTime = ms(s.elapsed); sumDist = String.format(Locale.US, "%.2f", m.dist / 1000);
                         sumDplus = String.valueOf(Math.round(m.dplus)); sumNp = i0(m.np()); sumTss = i0(m.tss());
                         sumKj = i0(m.kj); sumSpd = f1(m.spdAvg());
+                        try {
+                            org.json.JSONObject r = new org.json.JSONObject();
+                            r.put("t", System.currentTimeMillis()); r.put("dur", s.elapsed); r.put("dist", m.dist);
+                            r.put("dplus", m.dplus); r.put("np", m.np()); r.put("tss", m.tss()); r.put("kj", m.kj); r.put("spd", m.spdAvg());
+                            if (m.dist > 100 || s.elapsed > 60) host.saveRide(r);
+                        } catch (Exception ignored) {}
                         String f = host.finishRide();
                         sumFile = f != null && !f.isEmpty() ? f : null;
                         summary = true;
                         m.reset(); lastZone = -1;
                     } else confirm("finish", "TERMINER LA SORTIE ?", "TOUR : enregistrer le fichier .FIT", "START : reprendre");
-                } else openMenu();
+                } else goHome();
                 break;
         }
         invalidate();
@@ -329,14 +367,17 @@ public class Dash extends View {
             if (mapShown && mode == M_DASH && y > 52 && y < mapBottom()) {
                 if (x > 416 && y < 52 + 68) { host.mapZoom(1); return true; }
                 if (x > 416 && y > 52 + 68 && y < 52 + 124) { host.mapZoom(-1); return true; }
-                return false; // la carte reçoit le geste (déplacement, pincement)
+                if (y > 52 + 124 && y < 52 + 180 && x > (mapExplore ? 296 : 416)) {
+                    mapExplore = !mapExplore; host.mapExplore(mapExplore); invalidate(); return true;
+                }
+                if (mapExplore) return false; // la carte reçoit le geste (déplacement, pincement)
             }
             sx0 = e.getX(); return true;
         }
         if (e.getAction() == MotionEvent.ACTION_UP) {
             float dx = (e.getX() - sx0) / sc, x = e.getX() / sc, y = e.getY() / sc;
             if (learnStep >= 0) return true;
-            if (summary) { summary = false; invalidate(); return true; }
+            if (summary) { summary = false; goHome(); return true; }
             if (mode != M_DASH) { menuTap(x, y); return true; }
             if (Math.abs(dx) > 60) button(dx < 0 ? "next" : "prev");
             else if (y < 56) openMenu();              // appui sur l'en-tête : menu
@@ -359,7 +400,11 @@ public class Dash extends View {
         double k0 = Math.min(1, (n - pageT) / 380.0);
         boolean showMap = cur == P_MAP && k0 >= 1 && mode == M_DASH && !summary && learnStep < 0
                 && n >= confirmUntil && n - born > 3200 && host.mapReady();
-        if (showMap != mapShown) { mapShown = showMap; final boolean v = showMap; post(() -> host.setMapVisible(v)); }
+        if (showMap != mapShown) {
+            mapShown = showMap; final boolean v = showMap;
+            if (!v && mapExplore) { mapExplore = false; post(() -> host.mapExplore(false)); }
+            post(() -> host.setMapVisible(v));
+        }
         c.save();
         if (mapShown) c.clipRect(0, top, 480, mapBottom(), android.graphics.Region.Op.DIFFERENCE);
         c.drawColor(BG);
@@ -411,6 +456,8 @@ public class Dash extends View {
             c.drawRect(0, mb - 50, 480, mb, pf); pf.setShader(null);
             // position : flèche orientée selon le cap (carte nord en haut), au centre de la vue carte
             float px = 240, py = H / 2f;
+            float[] mp = host.mapPos();
+            if (mp != null) { px = mp[0] / sc; py = mp[1] / sc; }
             c.save(); c.translate(px, py); c.rotate(s.bearing);
             pf.setColor(0x5500E5C8); c.drawCircle(0, 0, 24, pf);
             path.reset(); path.moveTo(0, -17); path.lineTo(12, 13); path.lineTo(0, 6); path.lineTo(-12, 13); path.close();
@@ -419,6 +466,17 @@ public class Dash extends View {
             c.restore();
             // boutons zoom
             zoomBtn(c, 420, top + 16, "+"); zoomBtn(c, 420, top + 72, "−");
+            // mode exploration
+            if (mapExplore) {
+                pf.setColor(CYAN); rf.set(300, top + 128, 468, top + 176); c.drawRoundRect(rf, 12, 12, pf);
+                text(c, "◎ RECENTRER", 384, top + 159, bc7, 18, BG, Paint.Align.CENTER, .06f);
+                text(c, "EXPLORATION — glisse pour te déplacer", 240, mb - 14, b7, 13, CYAN, Paint.Align.CENTER, .04f);
+            } else {
+                pf.setColor(0xE60E151E); rf.set(420, top + 128, 468, top + 176); c.drawRoundRect(rf, 12, 12, pf);
+                ps.setColor(LINE); ps.setStrokeWidth(1); c.drawRoundRect(rf, 12, 12, ps);
+                // icône main / exploration
+                ps.setColor(TXT); ps.setStrokeWidth(2.5f); c.drawCircle(441, top + 149, 9, ps); c.drawLine(448, top + 156, 456, top + 164, ps);
+            }
             // nord
             pf.setColor(0xCC090E14); c.drawCircle(36, top + 40, 22, pf);
             ps.setColor(LINE); ps.setStrokeWidth(1); c.drawCircle(36, top + 40, 22, ps);
@@ -898,7 +956,130 @@ public class Dash extends View {
         }
     }
 
+    // ---------------------------------------------------------------- accueil
+
+    private static final String[] DAYS = {"D", "L", "M", "M", "J", "V", "S"};
+
+    private void drawHome(Canvas c, long n) {
+        c.drawColor(BG);
+        drawGlowStatic(c);
+        if (logoNct != null) {
+            float h = 26, w = logoNct.getWidth() * h / logoNct.getHeight();
+            rf.set(16, 13, 16 + w, 13 + h); c.drawBitmap(logoNct, null, rf, pb);
+            brand(c, 16, 45, 88, 48);
+        }
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        text(c, String.format(Locale.US, "%02d:%02d", cal.get(java.util.Calendar.HOUR_OF_DAY), cal.get(java.util.Calendar.MINUTE))
+                + (s.bat >= 0 ? "  ·  " + s.bat + "%" : ""), 464, 34, bc6, 18, MUTE, Paint.Align.RIGHT, 0);
+        pf.setColor(LINE); c.drawRect(0, 51, 480, 52, pf);
+
+        int hr = cal.get(java.util.Calendar.HOUR_OF_DAY);
+        text(c, hr < 5 || hr >= 18 ? "Bonsoir Cédric" : "Salut Cédric", 16, 100, bc8, 40, TXT, Paint.Align.LEFT, 0);
+        String date = new java.text.SimpleDateFormat("EEEE d MMMM", Locale.FRANCE).format(cal.getTime());
+        text(c, date.substring(0, 1).toUpperCase(Locale.FRANCE) + date.substring(1), 16, 126, b6, 16, MUTE, Paint.Align.LEFT, 0);
+
+        // bouton ROULER
+        float t = 142, b = 272;
+        pf.setShader(new LinearGradient(12, t, 468, b, new int[]{CYAN, 0xFF5FE0A0, AMBER, ORANGE}, new float[]{0, .45f, .8f, 1}, Shader.TileMode.CLAMP));
+        rf.set(12, t, 468, b); c.drawRoundRect(rf, 20, 20, pf); pf.setShader(null);
+        if (homeSel == 0) { ps.setColor(0xFFFFFFFF); ps.setStrokeWidth(3); rf.set(10, t - 2, 470, b + 2); c.drawRoundRect(rf, 22, 22, ps); }
+        boolean riding = !state.equals("idle");
+        text(c, riding ? "SORTIE EN COURS" : "PRÊT À ROULER", 36, t + 38, b7, 15, 0xBF090E14, Paint.Align.LEFT, .14f);
+        text(c, riding ? "REPRENDRE" : "ROULER", 34, t + 98, bc8, 64, BG, Paint.Align.LEFT, .03f);
+        text(c, "START pour " + (riding ? "revenir à la sortie" : "lancer la sortie"), 36, t + 120, b7, 14, 0xBF090E14, Paint.Align.LEFT, .1f);
+        text(c, "›", 440, t + 100, bc8, 56, BG, Paint.Align.CENTER, 0);
+
+        // capteurs
+        String[] cl = {"PUISSANCE", "CARDIO", "GPS"};
+        boolean[] ok = {s.sPwr, s.sHr, s.sGps};
+        float cw = (456 - 16) / 3f;
+        boolean blink = (n / 500) % 2 == 0;
+        for (int i = 0; i < 3; i++) {
+            float x = 12 + i * (cw + 8);
+            pf.setColor(TILE); rf.set(x, 284, x + cw, 322); c.drawRoundRect(rf, 19, 19, pf);
+            ps.setColor(LINE); ps.setStrokeWidth(1); c.drawRoundRect(rf, 19, 19, ps);
+            int col = ok[i] ? CYAN : (blink ? AMBER : 0x66FFB02E);
+            pf.setColor(col); c.drawCircle(x + 22, 303, 5, pf);
+            text(c, cl[i] + (ok[i] ? "" : "…"), x + 34, 309, bc7, 16, ok[i] ? TXT : MUTE, Paint.Align.LEFT, .05f);
+        }
+
+        // grille d'applis
+        float gt = 334, gw = (456 - 20) / 3f, gh = 96;
+        for (int i = 1; i < HOME.length; i++) {
+            int k = i - 1;
+            float x = 12 + (k % 3) * (gw + 10), y = gt + (k / 3) * (gh + 10);
+            boolean on = homeSel == i;
+            pf.setColor(on ? 0xFF13202B : TILE); rf.set(x, y, x + gw, y + gh); c.drawRoundRect(rf, 16, 16, pf);
+            ps.setColor(on ? CYAN : LINE); ps.setStrokeWidth(on ? 2 : 1); c.drawRoundRect(rf, 16, 16, ps);
+            homeIcon(c, i, x + gw / 2, y + 36, i == 3 ? ORANGE : i == 6 ? MUTE : CYAN);
+            text(c, HOME[i], x + gw / 2, y + 78, bc7, 15, TXT, Paint.Align.CENTER, .1f);
+            if (i == 1 || i == 3 || i == 4) text(c, "BIENTÔT", x + gw - 10, y + 18, b7, 9, AMBER, Paint.Align.RIGHT, .1f);
+        }
+
+        // semaine
+        float wt = gt + 2 * (gh + 10), wb = H - 12;
+        if (wb - wt > 90) {
+            tile(c, 12, wt, 468, wb, "CETTE SEMAINE", null);
+            long now7 = System.currentTimeMillis();
+            double km = 0, sec = 0, tss = 0; double[] day = new double[7];
+            java.util.Calendar d0 = java.util.Calendar.getInstance();
+            d0.set(java.util.Calendar.HOUR_OF_DAY, 0); d0.set(java.util.Calendar.MINUTE, 0); d0.set(java.util.Calendar.SECOND, 0);
+            long midnight = d0.getTimeInMillis();
+            for (org.json.JSONObject r : rides) {
+                long t0 = r.optLong("t");
+                int ago = (int) Math.floor((midnight + 86400000L - t0) / 86400000.0);
+                if (ago >= 0 && ago < 7) {
+                    km += r.optDouble("dist") / 1000; sec += r.optDouble("dur"); tss += r.optDouble("tss");
+                    day[6 - ago] += r.optDouble("dist") / 1000;
+                }
+            }
+            text(c, String.format(Locale.US, "%.0f km · %dh%02d · TSS %.0f", km, (int) (sec / 3600), (int) (sec / 60) % 60, tss),
+                    454, wt + 30, bc7, 16, TXT, Paint.Align.RIGHT, 0);
+            double mx = 1; for (double d : day) mx = Math.max(mx, d);
+            float bw = (428 - 6 * 8) / 7f, base = wb - 26, maxH = Math.max(10, base - (wt + 44));
+            int dow = cal.get(java.util.Calendar.DAY_OF_WEEK) - 1;
+            for (int i = 0; i < 7; i++) {
+                float x = 26 + i * (bw + 8), hh = (float) Math.max(4, day[i] / mx * maxH);
+                pf.setColor(day[i] > 0 ? CYAN : 0xFF1C2A38); rf.set(x, base - hh, x + bw, base); c.drawRoundRect(rf, 4, 4, pf);
+                text(c, DAYS[(dow - 6 + i + 14) % 7], x + bw / 2, wb - 8, bc6, 13, i == 6 ? TXT : MUTE, Paint.Align.CENTER, 0);
+            }
+            if (rides.isEmpty()) text(c, "Ta première sortie apparaîtra ici", 240, base - maxH / 2, b6, 14, DIM, Paint.Align.CENTER, 0);
+        }
+    }
+
+    private void homeIcon(Canvas c, int i, float cx, float cy, int col) {
+        pf.setColor(col); ps.setColor(col); ps.setStrokeWidth(3); ps.setStrokeCap(Paint.Cap.ROUND);
+        switch (i) {
+            case 1: for (int k = 0; k < 4; k++) { float h = new float[]{10, 22, 15, 28}[k]; rf.set(cx - 15 + k * 8, cy + 14 - h, cx - 10 + k * 8, cy + 14); c.drawRoundRect(rf, 2, 2, pf); } break;
+            case 2: c.drawCircle(cx, cy, 14, ps); c.drawLine(cx, cy, cx, cy - 8, ps); c.drawLine(cx, cy, cx + 6, cy + 4, ps); break;
+            case 3: path.reset(); path.moveTo(cx - 16, cy + 10); path.lineTo(cx - 6, cy - 2); path.lineTo(cx + 2, cy + 4); path.lineTo(cx + 16, cy - 12); c.drawPath(path, ps); break;
+            case 4: for (int k = 0; k < 4; k++) { float x = cx - 14 + (k % 2) * 16, y = cy - 14 + (k / 2) * 16; rf.set(x, y, x + 12, y + 12); c.drawRoundRect(rf, 2, 2, pf); } break;
+            case 5: c.save(); c.translate(cx - 12, cy - 14); c.scale(1.1f, 1.1f); c.drawPath(icBolt, pf); c.restore(); break;
+            default: c.drawCircle(cx, cy, 8, ps); for (int k = 0; k < 8; k++) { double a = k * Math.PI / 4; c.drawLine(cx + (float) (12 * Math.cos(a)), cy + (float) (12 * Math.sin(a)), cx + (float) (16 * Math.cos(a)), cy + (float) (16 * Math.sin(a)), ps); }
+        }
+        ps.setStrokeCap(Paint.Cap.BUTT);
+    }
+
+    private void drawHistory(Canvas c, long n) {
+        panelHeader(c, "HISTORIQUE", "▲▼ parcourir  ·  TOUR retour");
+        if (rides.isEmpty()) {
+            text(c, "Aucune sortie enregistrée pour l'instant.", 240, H / 2, b6, 17, MUTE, Paint.Align.CENTER, 0);
+            return;
+        }
+        int max = Math.max(1, (int) ((H - 74 - (ROW0 - 30)) / ROWH));
+        int start = Math.max(0, Math.min(histSel - max + 1, rides.size() - max));
+        java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("EEE d MMM · HH:mm", Locale.FRANCE);
+        for (int i = start; i < Math.min(rides.size(), start + max); i++) {
+            org.json.JSONObject r = rides.get(i);
+            String l1 = df.format(new java.util.Date(r.optLong("t"))).toUpperCase(Locale.FRANCE);
+            String l2 = String.format(Locale.US, "%.1f km  ·  %s  ·  %.0f W NP", r.optDouble("dist") / 1000, ms(r.optLong("dur")), r.optDouble("np"));
+            row(c, i - start, i == histSel, l1, l2, "TSS " + Math.round(r.optDouble("tss")), CYAN);
+        }
+    }
+
     private void drawMenus(Canvas c, long n) {
+        if (mode == M_HOME) { drawHome(c, n); return; }
+        if (mode == M_HIST) { drawHistory(c, n); return; }
         if (mode == M_MENU) {
             panelHeader(c, "MENU", "▲▼ naviguer  ·  START valider  ·  TOUR retour");
             int b = host.brightness();
@@ -952,6 +1133,18 @@ public class Dash extends View {
     }
 
     private void menuTap(float x, float y) {
+        if (mode == M_HOME) {
+            if (y < 56) return;
+            if (y >= 142 && y <= 272) { homeSel = 0; homeOk(0); }
+            else if (y >= 284 && y <= 322) { homeSel = 5; homeOk(5); }
+            else if (y >= 334 && y < 334 + 2 * 106) {
+                float gw = (456 - 20) / 3f;
+                int col = (int) Math.min(2, Math.max(0, (x - 12) / (gw + 10))), r = (int) ((y - 334) / 106);
+                homeSel = 1 + r * 3 + col; homeOk(homeSel);
+            }
+            invalidate(); return;
+        }
+        if (mode == M_HIST) { if (y > H - 64 || y < 56) mode = M_HOME; invalidate(); return; }
         if (y > H - 64) { button("lap"); return; } // bas d'écran : retour
         if (mode == M_MENU || mode == M_SENS) {
             int i = (int) Math.floor((y - (ROW0 - 30)) / ROWH);

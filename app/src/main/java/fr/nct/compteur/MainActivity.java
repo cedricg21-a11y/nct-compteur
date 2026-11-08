@@ -57,6 +57,7 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
         if (map.view != null) root.addView(map.view);
         root.addView(dash);
         setContentView(root);
+        dash.goHome();
 
         ride = Ride.get(this);
         ride.autoPause = cfg.getBoolean("autopause", true);
@@ -83,10 +84,13 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
             if (sim.time() == lapAt) dash.newLapQuiet();
         }
         dash.quiet = getIntent().getStringExtra("toast") == null;
+        dash.goDash();
         dash.showPageNow(getIntent().getIntExtra("page", 0));
         int md = getIntent().getIntExtra("mode", 0);
         if (md > 0 && md < 8) dash.openMode(md);
         if (md == 9) dash.demoSummary();
+        if (md == 10) dash.goHome();
+        if (md == 11) dash.openMode(5);
         if (md == 8) { sim.state = "pause"; dash.onSample(sim.step()); }
         demoH.post(new Runnable() { @Override public void run() { sample(sim.step()); demoH.postDelayed(this, 1000); } });
     }
@@ -246,6 +250,41 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
     @Override public void setAutoPause(boolean on) {
         if (sim != null) { simAuto = on; return; }
         ride.autoPause = on; cfg.edit().putBoolean("autopause", on).apply();
+    }
+
+    @Override public float[] mapPos() { return map == null ? null : map.positionPx(); }
+    @Override public void mapExplore(boolean on) { if (map != null) map.setExplore(on); }
+
+    @Override public java.util.List<JSONObject> rides() {
+        java.util.List<JSONObject> l = new java.util.ArrayList<>();
+        if (sim != null) {
+            long now = System.currentTimeMillis();
+            double[][] d = {{0, 3000, 19960, 551, 281, 105}, {2, 8040, 62400, 610, 231, 118}, {3, 3700, 31200, 210, 248, 66}, {6, 7200, 58100, 820, 225, 124}};
+            for (double[] x : d) {
+                try {
+                    JSONObject r = new JSONObject();
+                    r.put("t", now - (long) (x[0] * 86400000L) - 3600000L); r.put("dur", (long) x[1]); r.put("dist", x[2]);
+                    r.put("dplus", x[3]); r.put("np", x[4]); r.put("tss", x[5]); l.add(r);
+                } catch (Exception ignored) {}
+            }
+            return l;
+        }
+        try {
+            org.json.JSONArray a = new org.json.JSONArray(cfg.getString("rides", "[]"));
+            for (int i = a.length() - 1; i >= 0; i--) l.add(a.getJSONObject(i)); // plus récentes d'abord
+        } catch (Exception ignored) {}
+        return l;
+    }
+
+    @Override public void saveRide(JSONObject r) {
+        if (sim != null) return;
+        try {
+            org.json.JSONArray a = new org.json.JSONArray(cfg.getString("rides", "[]"));
+            a.put(r);
+            org.json.JSONArray keep = new org.json.JSONArray();
+            for (int i = Math.max(0, a.length() - 300); i < a.length(); i++) keep.put(a.get(i));
+            cfg.edit().putString("rides", keep.toString()).apply();
+        } catch (Exception ignored) {}
     }
 
     @Override public boolean mapReady() { return map != null && map.ready; }

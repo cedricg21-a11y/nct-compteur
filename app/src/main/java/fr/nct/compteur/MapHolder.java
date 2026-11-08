@@ -131,7 +131,23 @@ public class MapHolder {
             track.requestRedraw();
         }
         // suivi automatique, sauf si l'utilisateur vient de déplacer la carte
-        if (visible && System.currentTimeMillis() - userTouchT > 8000) view.setCenter(p);
+        if (visible && !explore) view.setCenter(p);
+    }
+
+    private boolean explore;
+
+    public void setExplore(boolean on) {
+        explore = on;
+        if (!on && lastPos != null && ready) view.setCenter(lastPos);
+    }
+
+    /** position actuelle en pixels écran (vue carte), ou null */
+    public float[] positionPx() {
+        if (!ready || lastPos == null || view == null) return null;
+        try {
+            org.mapsforge.core.model.Point pt = new org.mapsforge.map.util.MapViewProjection(view).toPixels(lastPos);
+            return pt == null ? null : new float[]{(float) pt.x, (float) pt.y};
+        } catch (Throwable t) { return null; }
     }
 
     public void zoom(int d) {
@@ -139,8 +155,7 @@ public class MapHolder {
         byte z = view.getModel().mapViewPosition.getZoomLevel();
         int nz = Math.max(10, Math.min(19, z + d));
         view.setZoomLevel((byte) nz);
-        if (lastPos != null) view.setCenter(lastPos);
-        userTouchT = 0;
+        if (lastPos != null && !explore) view.setCenter(lastPos);
     }
 
     public void clearTrack() {
