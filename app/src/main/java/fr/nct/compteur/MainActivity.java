@@ -220,7 +220,29 @@ public class MainActivity extends Activity implements Ride.Ui, Dash.Host {
 
     // ------------------------------------------------------------ Dash.Host
 
-    @Override public void bell() { if (sounds != null) sounds.play(bellId, 1f, 1f, 1, 0, 1f); }
+    private final Handler bellH = new Handler();
+    private int savedVol = -1;
+
+    /** sonnette : volume propre, indépendant du volume du compteur (on pousse le volume média le temps du son) */
+    @Override public void bell() {
+        int pct = bellVolume();
+        if (sounds == null || pct <= 0) return;
+        try {
+            android.media.AudioManager am = (android.media.AudioManager) getSystemService(AUDIO_SERVICE);
+            int max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC);
+            if (savedVol < 0) savedVol = am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC);
+            am.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, max, 0);
+            bellH.removeCallbacksAndMessages(null);
+            bellH.postDelayed(() -> {
+                try { if (savedVol >= 0) am.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, savedVol, 0); } catch (Exception ignored) {}
+                savedVol = -1;
+            }, 1600);
+        } catch (Exception ignored) {}
+        sounds.play(bellId, pct / 100f, pct / 100f, 1, 0, 1f);
+    }
+
+    @Override public int bellVolume() { return cfg.getInt("bellVol", 100); }
+    @Override public void setBellVolume(int pct) { cfg.edit().putInt("bellVol", pct).apply(); }
 
     @Override public void startStop() {
         if (sim != null) { sim.state = sim.state.equals("rec") ? "pause" : "rec"; sample(sim.step()); return; }
