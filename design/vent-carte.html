@@ -1,0 +1,69 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+@font-face{font-family:BC;src:url(fonts/bc-700.woff2);font-weight:700}
+@font-face{font-family:BC;src:url(fonts/bc-800.woff2);font-weight:800}
+@font-face{font-family:BC;src:url(fonts/bc-600.woff2);font-weight:600}
+@font-face{font-family:B;src:url(fonts/b-700.woff2);font-weight:700}
+*{margin:0;padding:0;box-sizing:border-box}body{background:#222;display:flex}
+.s{position:relative;width:480px;height:800px;background:url(map-bg.png) 0 0/480px 800px;overflow:hidden;margin-right:10px;font-family:B;color:#eef3f7}
+.cover{position:absolute;background:#090e14}
+.lab{font-weight:700;font-size:13px;letter-spacing:1.6px;color:#6c7d90}
+.big{font-family:BC;font-weight:700;line-height:1}
+.title{position:absolute;left:0;right:0;top:-40px;text-align:center;font-family:BC;font-weight:800;font-size:22px;letter-spacing:3px}
+</style></head><body>
+<!-- V1 : anneau autour de la flèche + badge -->
+<div class="s" id="v1">
+  <div class="cover" style="left:990px"></div>
+  <!-- masque l'ancienne flèche et la boussole -->
+  <svg width="480" height="800" style="position:absolute;left:0;top:0">
+    <defs><filter id="sh"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity=".5"/></filter></defs>
+    <circle cx="240" cy="400" r="30" fill="#f7f7f5"/>
+    <!-- anneau vent : secteur d'où vient le vent (avant-gauche) -->
+    <circle cx="240" cy="400" r="46" fill="none" stroke="rgba(9,14,20,.35)" stroke-width="10"/>
+    <path d="M211.7 358.3 A50 50 0 0 1 262 355" fill="none" stroke="#e85022" stroke-width="12" stroke-linecap="round" transform="translate(0,4)" filter="url(#sh)"/>
+    <polygon points="240,382 252,412 240,405 228,412" fill="#fff" stroke="#090e14" stroke-width="2.5" stroke-linejoin="round" transform="rotate(-62 240 400)" filter="url(#sh)"/>
+    <!-- badge vent en haut à gauche -->
+    <rect x="12" y="102" width="150" height="70" rx="14" fill="rgba(9,14,20,.88)" stroke="#1a2532"/>
+    <circle cx="44" cy="137" r="22" fill="none" stroke="#1a2532" stroke-width="3"/>
+    <polygon points="44,121 51,139 44,135 37,139" fill="#6c7d90" />
+    <line x1="30" y1="117" x2="40" y2="129" stroke="#e85022" stroke-width="5" stroke-linecap="round"/>
+    <polygon points="36,131 44,133 42,124" fill="#e85022"/>
+    <text x="76" y="132" font-family="BC" font-weight="800" font-size="26" fill="#e85022">17</text>
+    <text x="104" y="132" font-family="BC" font-weight="600" font-size="13" fill="#6c7d90">km/h</text>
+    <text x="76" y="155" font-family="B" font-weight="700" font-size="12" fill="#eef3f7" letter-spacing="1">DE FACE</text>
+  </svg>
+  <div class="cover" style="left:12px;top:626px;width:456px;height:100px;background:transparent"></div>
+</div>
+<!-- V2 : flux de vent + champ VENT dans le bandeau -->
+<div class="s" id="v2">
+  <svg width="480" height="800" style="position:absolute;left:0;top:0">
+    <g stroke="#e85022" stroke-linecap="round" opacity=".55">
+      <path d="M40 140 l60 60" stroke-width="3"/><path d="M150 110 l50 50" stroke-width="2"/><path d="M300 150 l60 60" stroke-width="3"/>
+      <path d="M90 300 l55 55" stroke-width="2"/><path d="M330 290 l60 60" stroke-width="3"/><path d="M200 220 l40 40" stroke-width="2"/>
+      <path d="M30 450 l50 50" stroke-width="3"/><path d="M360 430 l50 50" stroke-width="2"/><path d="M130 500 l60 60" stroke-width="3"/>
+      <path d="M260 520 l45 45" stroke-width="2"/><path d="M400 520 l40 40" stroke-width="3"/>
+    </g>
+    <circle cx="240" cy="400" r="30" fill="#f7f7f5"/>
+    <circle cx="240" cy="400" r="22" fill="rgba(0,229,200,.35)"/>
+    <polygon points="240,382 252,412 240,405 228,412" fill="#fff" stroke="#090e14" stroke-width="2.5" stroke-linejoin="round" transform="rotate(-62 240 400)"/>
+    <!-- bandeau : le champ VENT remplace la puissance -->
+    <rect x="12" y="626" width="145" height="100" rx="14" fill="#1f1310" stroke="#e85022" stroke-width="2"/>
+    <text x="26" y="656" font-family="B" font-weight="700" font-size="13" fill="#e85022" letter-spacing="1.6">VENT DE FACE</text>
+    <text x="26" y="708" font-family="BC" font-weight="700" font-size="54" fill="#eef3f7">17</text>
+    <text x="82" y="708" font-family="BC" font-weight="600" font-size="16" fill="#6c7d90">KM/H</text>
+    <rect x="26" y="714" width="117" height="5" rx="2" fill="#2a1a14"/><rect x="26" y="714" width="78" height="5" rx="2" fill="#e85022"/>
+  </svg>
+</div>
+<!-- V3 : bord d'écran coloré (lecture périphérique) -->
+<div class="s" id="v3">
+  <svg width="480" height="800" style="position:absolute;left:0;top:0">
+    <defs><linearGradient id="edge" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e85022" stop-opacity=".95"/><stop offset=".5" stop-color="#e85022" stop-opacity=".0"/></linearGradient></defs>
+    <rect x="0" y="88" width="480" height="140" fill="url(#edge)" opacity=".55"/>
+    <rect x="0" y="88" width="8" height="530" fill="#e85022"/><rect x="472" y="88" width="8" height="530" fill="#ffb02e" opacity=".5"/>
+    <rect x="120" y="100" width="240" height="44" rx="22" fill="rgba(9,14,20,.9)" stroke="#e85022" stroke-width="2"/>
+    <text x="240" y="129" text-anchor="middle" font-family="BC" font-weight="800" font-size="21" fill="#eef3f7" letter-spacing="1">↘ VENT DE FACE · 17 km/h</text>
+    <circle cx="240" cy="400" r="30" fill="#f7f7f5"/>
+    <circle cx="240" cy="400" r="22" fill="rgba(0,229,200,.35)"/>
+    <polygon points="240,382 252,412 240,405 228,412" fill="#fff" stroke="#090e14" stroke-width="2.5" stroke-linejoin="round" transform="rotate(-62 240 400)"/>
+  </svg>
+</div>
+</body></html>
