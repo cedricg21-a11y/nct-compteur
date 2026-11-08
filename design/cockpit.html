@@ -1,0 +1,216 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Cockpit NCT</title><style>
+@font-face{font-family:BC;src:url(fonts/bc-500.woff2);font-weight:500}
+@font-face{font-family:BC;src:url(fonts/bc-600.woff2);font-weight:600}
+@font-face{font-family:BC;src:url(fonts/bc-700.woff2);font-weight:700}
+@font-face{font-family:BC;src:url(fonts/bc-800.woff2);font-weight:800}
+@font-face{font-family:B;src:url(fonts/b-600.woff2);font-weight:600}
+@font-face{font-family:B;src:url(fonts/b-700.woff2);font-weight:700}
+:root{--bg:#06090d;--mute:#6c7d90;--txt:#eef3f7;--cyan:#00e5c8;--orange:#e85022;--amber:#ffb02e;--hair:#1c2836}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1b1b1b;display:flex;gap:28px;padding:44px 20px 20px;font-family:B}
+.w{position:relative}
+.cap{position:absolute;left:0;top:-32px;font-family:BC;font-weight:800;color:#fff;font-size:20px;letter-spacing:2px}
+.s{position:relative;width:480px;height:800px;background:var(--bg);color:var(--txt);overflow:hidden;display:flex;flex-direction:column}
+.hd{height:44px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 16px}
+.hd .tm{font-family:BC;font-weight:700;font-size:26px}
+.hd img{height:22px}
+.hd .bt{font-family:BC;font-weight:700;font-size:22px;display:flex;align-items:center}
+.hd .bt i{display:inline-block;width:30px;height:15px;border:2px solid var(--txt);border-radius:3px;margin-left:6px;position:relative}
+.hd .bt i:after{content:"";position:absolute;left:2px;top:2px;bottom:2px;width:12px;background:var(--txt)}
+.dots{height:16px;flex:none;display:flex;justify-content:center;align-items:center}
+.dots i{width:22px;height:4px;border-radius:2px;background:#202c3a;margin:0 3px}.dots i.on{background:var(--cyan);width:34px}
+.grid{flex:none;display:grid;grid-template-columns:1fr 1fr 1fr}
+.c{height:92px;padding:8px 16px 0;position:relative}
+.c+.c{border-left:1px solid var(--hair)}
+.c:nth-child(4){border-left:none}
+.c:nth-child(-n+3){border-bottom:1px solid var(--hair)}
+.lab{font-family:BC;font-weight:600;font-size:17px;letter-spacing:1px;color:var(--mute)}
+.lab b{color:var(--txt);font-weight:600}
+.num{font-family:BC;font-weight:700;line-height:.9;letter-spacing:-1px;font-variant-numeric:tabular-nums}
+.c .num{font-size:56px;margin-top:2px}
+.c .tr{position:absolute;right:14px;top:10px;font-family:BC;font-weight:700;font-size:15px}
+.band{flex:1;position:relative;background:#0c131b;border-top:2px solid var(--cyan);padding:10px 18px 0;display:flex;justify-content:space-between}
+.band .num{font-size:58px;margin-top:2px}
+.band .pg{position:absolute;left:18px;right:18px;bottom:14px;height:6px;background:#1a2532;border-radius:3px}
+.band .pg i{position:absolute;left:0;top:0;bottom:0;width:58%;background:var(--cyan);border-radius:3px}
+</style></head><body>
+
+<!-- 1. ÉVOLUTION -->
+<div class="w"><div class="cap">1 · ÉVOLUTION</div>
+<div class="s">
+  <div class="hd"><span class="tm">9:42</span><img src="logo-nct.png"><span class="bt">50%<i></i></span></div>
+  <svg width="480" height="400" viewBox="0 0 480 400" style="flex:none">
+    <defs>
+      <linearGradient id="pw" x1="0" x2="1"><stop offset="0" stop-color="#00e5c8"/><stop offset=".5" stop-color="#9be36a"/><stop offset=".72" stop-color="#ffb02e"/><stop offset="1" stop-color="#e85022"/></linearGradient>
+      <linearGradient id="fr" x1="0" x2="1"><stop offset="0" stop-color="#00e5c8"/><stop offset="1" stop-color="#ffb02e"/></linearGradient>
+    </defs>
+    <!-- cadre facetté -->
+    <path d="M30 14 H450 L470 34 V330 L436 364 H330 L272 306 H208 L150 364 H44 L10 330 V34 Z" fill="#0a1017" stroke="#14202c" stroke-width="2"/>
+    <path d="M10 120 V34 L30 14 H150" fill="none" stroke="#00e5c8" stroke-width="4"/>
+    <path d="M330 14 H450 L470 34 V120" fill="none" stroke="#ffb02e" stroke-width="4"/>
+    <path d="M10 270 V330 L44 364 H110" fill="none" stroke="#00e5c8" stroke-width="4"/>
+    <path d="M470 270 V330 L436 364 H370" fill="none" stroke="#ffb02e" stroke-width="4"/>
+    <!-- arc puissance : piste + remplissage dégradé + graduations -->
+    <g transform="translate(240 214)">
+      <path d="M-148 86 A171 171 0 1 1 148 86" fill="none" stroke="#141f2b" stroke-width="10" stroke-linecap="round"/>
+      <path d="M-148 86 A171 171 0 0 1 64 -158" fill="none" stroke="url(#pw)" stroke-width="10" stroke-linecap="round"/>
+      <!-- repère NP (fantôme) -->
+      <circle cx="-4" cy="-171" r="5" fill="none" stroke="#eef3f7" stroke-width="2"/>
+      <circle cx="64" cy="-158" r="10" fill="#fff" stroke="#06090d" stroke-width="3"/>
+      <g stroke="#3a4a5c" stroke-width="3"><line x1="-128" y1="-128" x2="-136" y2="-136"/><line x1="128" y1="-128" x2="136" y2="-136"/></g>
+      <text x="-146" y="-142" fill="#8a9bb0" font-family="BC" font-weight="700" font-size="18" text-anchor="middle">200</text>
+      <text x="146" y="-142" fill="#8a9bb0" font-family="BC" font-weight="700" font-size="18" text-anchor="middle">400</text>
+      <!-- arc vitesse segmenté (intérieur) -->
+      <g id="seg"></g>
+    </g>
+    <!-- valeurs centrales -->
+    <text x="240" y="32" fill="#8a9bb0" font-family="BC" font-weight="700" font-size="18" text-anchor="middle">NP <tspan fill="#eef3f7">228</tspan></text>
+    <text x="240" y="158" fill="#ffb02e" font-family="BC" font-weight="800" font-size="46" text-anchor="middle">317<tspan font-size="20" fill="#8a9bb0"> W</tspan></text>
+    <text x="240" y="250" fill="#eef3f7" font-family="BC" font-weight="800" font-size="108" text-anchor="middle" letter-spacing="-3">32.6</text>
+    <text x="240" y="286" fill="#00e5c8" font-family="BC" font-weight="700" font-size="28" text-anchor="middle">▲ moy 29.9</text>
+    <!-- jauges latérales : W'bal / FC -->
+    <text x="36" y="66" fill="#e85022" font-family="BC" font-weight="800" font-size="26">20%</text>
+    <rect x="34" y="78" width="14" height="190" rx="7" fill="#141f2b"/><rect x="34" y="230" width="14" height="38" rx="7" fill="#e85022"/>
+    <path d="M44 286 l-8 12 h6 l-2 10 l9 -13 h-6 z" fill="#8a9bb0"/>
+    <text x="444" y="66" fill="#00e5c8" font-family="BC" font-weight="800" font-size="26" text-anchor="end">165</text>
+    <rect x="432" y="78" width="14" height="190" rx="7" fill="#141f2b"/>
+    <g><rect x="432" y="230" width="14" height="38" fill="#00e5c8" opacity=".5"/><rect x="432" y="192" width="14" height="38" fill="#9be36a" opacity=".6"/><rect x="432" y="154" width="14" height="38" fill="#ffd23e"/><rect x="432" y="130" width="14" height="24" fill="#ffb02e"/></g>
+    <path d="M439 300 c-6-4-10-7-10-11a5 5 0 0 1 10-2a5 5 0 0 1 10 2c0 4-4 7-10 11z" fill="#8a9bb0"/>
+    <!-- découpe vent -->
+    <g transform="translate(176 346) rotate(-35)"><path d="M0-16 L12 14 L0 7 L-12 14Z" fill="#e85022"/></g>
+    <text x="206" y="364" fill="#eef3f7" font-family="BC" font-weight="800" font-size="48">22</text>
+    <text x="262" y="342" fill="#8a9bb0" font-family="BC" font-weight="700" font-size="18">NO</text>
+    <text x="262" y="362" fill="#e85022" font-family="BC" font-weight="700" font-size="16">DE FACE</text>
+  </svg>
+  <div class="dots"><i class="on"></i><i></i><i></i><i></i><i></i></div>
+  <div class="grid">
+    <div class="c"><div class="lab">TOUR 3 · <b>31.2</b></div><div class="num">13:27</div></div>
+    <div class="c" style="text-align:center"><div class="lab">CADENCE</div><div class="num">85</div></div>
+    <div class="c" style="text-align:right"><div class="lab">DISTANCE</div><div class="num">68.6</div></div>
+    <div class="c"><div class="lab">D+</div><div class="num">1244</div></div>
+    <div class="c" style="text-align:center"><div class="lab">PENTE %</div><div class="num" style="color:#ffd23e">6.2</div></div>
+    <div class="c" style="text-align:right"><div class="lab">ALTITUDE</div><div class="num">412</div></div>
+  </div>
+  <div class="band"><div><div class="lab">CHRONO</div><div class="num">2:18:27</div></div><div style="text-align:right"><div class="lab">ARRIVÉE <b>11:05</b></div><div class="num" style="color:#00e5c8">42.6<span style="font-size:28px"> km</span></div></div><div class="pg"><i></i></div></div>
+</div></div>
+
+<!-- 2. BOUSSOLE -->
+<div class="w"><div class="cap">2 · BOUSSOLE</div>
+<div class="s">
+  <div class="hd"><span class="tm">9:42</span><img src="logo-nct.png"><span class="bt">50%<i></i></span></div>
+  <svg width="480" height="400" viewBox="0 0 480 400" style="flex:none">
+    <defs><linearGradient id="pw2" x1="0" x2="1"><stop offset="0" stop-color="#00e5c8"/><stop offset=".55" stop-color="#9be36a"/><stop offset=".75" stop-color="#ffb02e"/><stop offset="1" stop-color="#e85022"/></linearGradient></defs>
+    <g transform="translate(240 202)">
+      <!-- lunette vent (anneau extérieur) -->
+      <circle r="190" fill="none" stroke="#111a24" stroke-width="16"/>
+      <g id="ticks2"></g>
+      <path d="M-56 -182 A190 190 0 0 1 56 -182" fill="none" stroke="#e85022" stroke-width="16" opacity=".3"/>
+      <circle cx="-66" cy="-178" r="21" fill="#e85022" stroke="#fff" stroke-width="3"/>
+      <text x="-66" y="-170" fill="#fff" font-family="BC" font-weight="800" font-size="22" text-anchor="middle">22</text>
+      <text x="0" y="-128" fill="#e85022" font-family="BC" font-weight="700" font-size="14" text-anchor="middle" letter-spacing="2">VENT DE FACE</text>
+      <!-- arc puissance -->
+      <path d="M-120 104 A159 159 0 1 1 120 104" fill="none" stroke="#141f2b" stroke-width="22" stroke-linecap="round"/>
+      <path d="M-120 104 A159 159 0 0 1 96 -127" fill="none" stroke="url(#pw2)" stroke-width="22" stroke-linecap="round"/>
+      <circle cx="96" cy="-127" r="13" fill="#fff" stroke="#06090d" stroke-width="4"/>
+      <!-- arc FC (gauche intérieur) et W'bal (droite intérieur) -->
+      <path d="M-128 50 A138 138 0 0 1 -112 -80" fill="none" stroke="#141f2b" stroke-width="8" stroke-linecap="round"/>
+      <path d="M-128 50 A138 138 0 0 1 -122 -62" fill="none" stroke="#ff6b3d" stroke-width="8" stroke-linecap="round"/>
+      <path d="M128 50 A138 138 0 0 0 112 -80" fill="none" stroke="#141f2b" stroke-width="8" stroke-linecap="round"/>
+      <path d="M128 50 A138 138 0 0 0 134 24" fill="none" stroke="#e85022" stroke-width="8" stroke-linecap="round"/>
+      <text x="-222" y="168" fill="#ff6b3d" font-family="BC" font-weight="800" font-size="40">165</text>
+      <text x="-222" y="190" fill="#6c7d90" font-family="BC" font-weight="600" font-size="13" letter-spacing="1">♥ BPM</text>
+      <text x="222" y="168" fill="#e85022" font-family="BC" font-weight="800" font-size="40" text-anchor="end">20%</text>
+      <text x="222" y="190" fill="#6c7d90" font-family="BC" font-weight="600" font-size="13" text-anchor="end" letter-spacing="1">⚡ W'BAL</text>
+      <!-- centre -->
+      <text y="-58" fill="#ffb02e" font-family="BC" font-weight="800" font-size="56" text-anchor="middle">317<tspan font-size="20" fill="#6c7d90"> W</tspan></text>
+      <text y="-34" fill="#ffb02e" font-family="BC" font-weight="700" font-size="16" text-anchor="middle" letter-spacing="2">Z5 · PMA · NP 228</text>
+      <text y="56" fill="#eef3f7" font-family="BC" font-weight="800" font-size="104" text-anchor="middle" letter-spacing="-3">32.6</text>
+      <text y="88" fill="#6c7d90" font-family="BC" font-weight="700" font-size="18" text-anchor="middle" letter-spacing="2">KM/H · <tspan fill="#00e5c8">▲ 29.9</tspan></text>
+      <!-- vélo (sens de marche) -->
+      <path d="M0 132 l12 30 l-12 -7 l-12 7z" fill="#eef3f7" transform="translate(0 -20)"/>
+    </g>
+  </svg>
+  <div class="dots"><i class="on"></i><i></i><i></i><i></i><i></i></div>
+  <div class="grid">
+    <div class="c"><div class="lab">TOUR 3</div><div class="num">13:27</div><div class="tr" style="color:#00e5c8">▲ 12 W</div></div>
+    <div class="c" style="text-align:center"><div class="lab">CADENCE</div><div class="num">85</div></div>
+    <div class="c" style="text-align:right"><div class="lab">DISTANCE</div><div class="num">68.6</div></div>
+    <div class="c"><div class="lab">D+</div><div class="num">1244</div></div>
+    <div class="c" style="text-align:center"><div class="lab">PENTE %</div><div class="num" style="color:#ffd23e">6.2</div></div>
+    <div class="c" style="text-align:right"><div class="lab">ALTITUDE</div><div class="num">412</div></div>
+  </div>
+  <div class="band"><div><div class="lab">CHRONO</div><div class="num">2:18:27</div></div><div style="text-align:right"><div class="lab">ARRIVÉE <b>11:05</b></div><div class="num" style="color:#00e5c8">42.6<span style="font-size:28px"> km</span></div></div><div class="pg"><i></i></div></div>
+</div></div>
+
+<!-- 3. AVIONIQUE -->
+<div class="w"><div class="cap">3 · AVIONIQUE</div>
+<div class="s">
+  <div class="hd"><span class="tm">9:42</span><img src="logo-nct.png"><span class="bt">50%<i></i></span></div>
+  <svg width="480" height="400" viewBox="0 0 480 400" style="flex:none">
+    <defs>
+      <clipPath id="ah"><rect x="96" y="10" width="288" height="380" rx="6"/></clipPath>
+      <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d2a3a"/><stop offset="1" stop-color="#103245"/></linearGradient>
+      <linearGradient id="gnd" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a1a10"/><stop offset="1" stop-color="#1a110b"/></linearGradient>
+      <clipPath id="tp"><rect x="0" y="10" width="92" height="380"/></clipPath>
+      <clipPath id="tp2"><rect x="388" y="10" width="92" height="380"/></clipPath>
+    </defs>
+    <!-- horizon : incliné selon la pente (6 %) -->
+    <g clip-path="url(#ah)">
+      <rect x="0" y="-300" width="480" height="1000" fill="url(#sky)"/>
+      <g transform="rotate(-6 240 230)">
+        <rect x="-100" y="230" width="700" height="600" fill="url(#gnd)"/>
+        <line x1="-100" y1="230" x2="600" y2="230" stroke="#ffd23e" stroke-width="3"/>
+        <g stroke="#ffffff55" stroke-width="2"><line x1="200" y1="190" x2="280" y2="190"/><line x1="215" y1="150" x2="265" y2="150"/><line x1="200" y1="270" x2="280" y2="270"/></g>
+        <text x="290" y="194" fill="#ffffff88" font-family="BC" font-weight="600" font-size="13">5%</text><text x="275" y="154" fill="#ffffff88" font-family="BC" font-weight="600" font-size="13">10%</text>
+      </g>
+      <!-- maquette vélo fixe -->
+      <path d="M170 230 h46 l10 12 l10 -12 h46" fill="none" stroke="#eef3f7" stroke-width="5" stroke-linejoin="round"/>
+      <circle cx="240" cy="230" r="4" fill="#eef3f7"/>
+      <text x="240" y="62" fill="#eef3f7" font-family="BC" font-weight="800" font-size="96" text-anchor="middle" letter-spacing="-3" transform="translate(0 36)">32.6</text>
+      <text x="240" y="124" fill="#8fb3c8" font-family="BC" font-weight="700" font-size="17" text-anchor="middle" letter-spacing="2">KM/H · <tspan fill="#00e5c8">▲ 29.9</tspan></text>
+      <text x="240" y="330" fill="#ffd23e" font-family="BC" font-weight="800" font-size="58" text-anchor="middle">6.2<tspan font-size="26">%</tspan></text>
+      <text x="240" y="356" fill="#c8a98a" font-family="BC" font-weight="700" font-size="15" text-anchor="middle" letter-spacing="2">PENTE · VAM 1 080</text>
+      <!-- vent en haut de l'horizon -->
+      <g transform="translate(240 160)"></g>
+    </g>
+    <!-- ruban puissance (gauche) -->
+    <g clip-path="url(#tp)">
+      <rect x="0" y="10" width="92" height="380" fill="#0a1017"/>
+      <g id="tape"></g>
+    </g>
+    <path d="M0 206 H84 L94 230 L84 254 H0Z" fill="#06090d" stroke="#ffb02e" stroke-width="3"/>
+    <text x="44" y="245" fill="#ffb02e" font-family="BC" font-weight="800" font-size="40" text-anchor="middle">317</text>
+    <text x="46" y="30" fill="#6c7d90" font-family="BC" font-weight="700" font-size="14" text-anchor="middle" letter-spacing="1">WATTS</text>
+    <!-- ruban FC (droite) -->
+    <g clip-path="url(#tp2)"><rect x="388" y="10" width="92" height="380" fill="#0a1017"/><g id="tape2"></g></g>
+    <path d="M480 206 H396 L386 230 L396 254 H480Z" fill="#06090d" stroke="#ff6b3d" stroke-width="3"/>
+    <text x="436" y="245" fill="#ff6b3d" font-family="BC" font-weight="800" font-size="40" text-anchor="middle">165</text>
+    <text x="434" y="30" fill="#6c7d90" font-family="BC" font-weight="700" font-size="14" text-anchor="middle" letter-spacing="1">BPM</text>
+    <!-- vent : point sur l'arc supérieur -->
+    <path d="M150 386 A150 60 0 0 1 330 386" fill="none" stroke="#ffffff22" stroke-width="2"/>
+    <circle cx="214" cy="333" r="0" fill="none"/>
+  </svg>
+  <div class="dots"><i class="on"></i><i></i><i></i><i></i><i></i></div>
+  <div class="grid">
+    <div class="c"><div class="lab">VENT</div><div class="num" style="color:#e85022">22<span style="font-size:20px"> ↘ FACE</span></div></div>
+    <div class="c" style="text-align:center"><div class="lab">CADENCE</div><div class="num">85</div></div>
+    <div class="c" style="text-align:right"><div class="lab">DISTANCE</div><div class="num">68.6</div></div>
+    <div class="c"><div class="lab">W'BAL</div><div class="num" style="color:#e85022">20%</div></div>
+    <div class="c" style="text-align:center"><div class="lab">NP</div><div class="num">228</div></div>
+    <div class="c" style="text-align:right"><div class="lab">D+</div><div class="num">1244</div></div>
+  </div>
+  <div class="band"><div><div class="lab">CHRONO</div><div class="num">2:18:27</div></div><div style="text-align:right"><div class="lab">ARRIVÉE <b>11:05</b></div><div class="num" style="color:#00e5c8">42.6<span style="font-size:28px"> km</span></div></div><div class="pg"><i></i></div></div>
+</div></div>
+
+<script>
+// arc vitesse segmenté (variante 1)
+(function(){var g=document.getElementById('seg'),h='',n=34,r=132;for(var i=0;i<n;i++){var a=(135+270*i/(n-1))*Math.PI/180,on=i<22;var x1=r*Math.cos(a),y1=r*Math.sin(a),x2=(r-22)*Math.cos(a),y2=(r-22)*Math.sin(a);var col=on?(i<8?'#1f6fff':i<16?'#1aa8ff':'#00d4ff'):'#16222e';h+='<line x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'" stroke="'+col+'" stroke-width="9" stroke-linecap="round"/>'}g.innerHTML=h})();
+// graduations lunette (variante 2)
+(function(){var g=document.getElementById('ticks2'),h='';for(var i=0;i<72;i++){var a=i*5*Math.PI/180,l=i%18==0?14:i%6==0?9:5;h+='<line x1="'+(190-l/2)*Math.sin(a)+'" y1="'+(-(190-l/2)*Math.cos(a))+'" x2="'+(190+l/2)*Math.sin(a)+'" y2="'+(-(190+l/2)*Math.cos(a))+'" stroke="#2a3a4c" stroke-width="2"/>'}g.innerHTML=h})();
+// rubans (variante 3)
+function tape(id,x,cur,step,lo,col){var g=document.getElementById(id),h='';var zc=['#5f7a94','#00e5c8','#9be36a','#ffd23e','#ffb02e','#ff7a2e','#e85022'];for(var v=lo;v<lo+step*20;v+=step/5){var y=230-(v-cur)*(24/(step/5));if(y<0||y>400)continue;var major=Math.round(v)%step===0;h+='<line x1="'+(x?x:70)+'" y1="'+y+'" x2="'+(x?x+(major?22:12):(major?48:58))+'" y2="'+y+'" stroke="#3a4a5c" stroke-width="2"/>';if(major)h+='<text x="'+(x?x+28:40)+'" y="'+(y+6)+'" fill="#8a9bb0" font-family="BC" font-weight="700" font-size="17" text-anchor="'+(x?'start':'end')+'">'+Math.round(v)+'</text>'}g.innerHTML=h}
+tape('tape',0,317,50,0);
+(function(){var g=document.getElementById('tape'),h='',zc=['#5f7a94','#00e5c8','#9be36a','#ffd23e','#ffb02e','#ff7a2e','#e85022'],zb=[0,138,188,225,263,300,375,600];for(var i=0;i<7;i++){var y1=230-(zb[i]-317)*(24/10),y2=230-(zb[i+1]-317)*(24/10);h+='<rect x="80" y="'+y2+'" width="10" height="'+(y1-y2)+'" fill="'+zc[i]+'"/>'}g.innerHTML+=h})();
+tape('tape2',392,165,10,100);
+</script>
+</body></html>
